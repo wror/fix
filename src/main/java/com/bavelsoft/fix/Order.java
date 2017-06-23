@@ -1,24 +1,27 @@
 package com.bavelsoft.fix;
 
-import static com.bavelsoft.fix.OrdStatus.Rejected;
-import static com.bavelsoft.fix.OrdStatus.DoneForDay;
-import static com.bavelsoft.fix.OrdStatus.Canceled;
+import com.bavelsoft.fix.OrdStatus;
 
 public class Order {
         private Object fields;
-        private long cumQty, leavesQty, orderID;
+	private String orderID;
         private double avgPx;
-        Request lastRequest;
-        OrdStatus terminalStatus;
+        private long orderQty, cumQty, leavesQty, pendingOrderQty;
+	private OrdStatus terminalOrdStatus, pendingOrdStatus;
+	private PendingRequests pendingRequests = new PendingRequests();
 
-        public void reject() {
-                terminalStatus = Rejected;
-                leavesQty = 0;
+        public void fill(Execution x) {
+		double totalValue = x.getQty() * x.getPrice() + cumQty * avgPx;
+                avgPx = totalValue / (cumQty + x.getQty());
+                cumQty += x.getQty();
+                leavesQty -= x.getQty();
         }
 
-        public void done() {
-                terminalStatus = DoneForDay;
-                leavesQty = 0;
+        public void replace(Object newFields, long requestedOrderQty) {
+		long newOrderQty = Math.max(requestedOrderQty, cumQty);
+		leavesQty += newOrderQty - orderQty;
+                orderQty = newOrderQty;
+                fields = newFields;
         }
 
         public void cancel() {
@@ -28,33 +31,51 @@ public class Order {
         public void cancel(long qtyChange) {
                 leavesQty -= qtyChange;
 		if (leavesQty <= 0)
-			terminalStatus = Canceled;
+			terminalOrdStatus = OrdStatus.Canceled;
         }
 
-        public void replace(Object fields) {
-                this.fields = fields;
+        public OrdStatus getOrdStatus(Order order) {
+		return
+                    terminalOrdStatus != null ? terminalOrdStatus :
+                     pendingOrdStatus != null ? pendingOrdStatus :
+                           cumQty >= orderQty ? OrdStatus.Filled :
+                                   cumQty > 0 ? OrdStatus.PartiallyFilled
+                                              : OrdStatus.New;
         }
 
-        public void fill(Execution x) {
-                avgPx = x.getNewAvgPx(this);
-                cumQty += x.getQty();
-                leavesQty -= x.getQty();
+	public void updateWithRequest(Request request) {
+		pendingRequests.addOrRemove(request);
+		pendingOrdStatus = pendingRequests.getOrdStatus();
+		pendingOrderQty = pendingRequests.getMaxOrderQty();
+	}
+
+        public void done() {
+                leavesQty = 0;
+                terminalOrdStatus = OrdStatus.DoneForDay;
         }
 
-        public void request(Request request) {
-                request.previousRequest = lastRequest;
-                lastRequest = request;
+        public void reject() {
+                leavesQty = 0;
+                terminalOrdStatus = OrdStatus.Rejected;
         }
+
+	public long getOrderQty() {
+		return orderQty;
+	}
 
 	public long getCumQty() {
 		return cumQty;
 	}
 
-	public double getAvgPx() {
-		return avgPx;
+	public long getLeavesQty() {
+		return leavesQty;
 	}
 
-	public long getOrderQty() {
-		return 0; //TODO should come from fields
+	public String getOrderID() {
+		return orderID;
+	}
+
+	public double getAvgPx() {
+		return avgPx;
 	}
 }

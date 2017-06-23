@@ -1,35 +1,42 @@
 package com.bavelsoft.fix;
 
+import com.bavelsoft.fix.OrdStatus;
+import com.bavelsoft.fix.ExecType;
+
 public abstract class Request {
         private String clOrdID;
-        private boolean isRejected, isAccepted;
-        protected Order order;
-        protected Request previousRequest;
+        private Order order;
+	private boolean isPending = true;
 
-        Request(Order order) {
+        protected void onAccept() {}
+        protected void onReject() {}
+	public long getPendingOrderQty() { return 0; }
+        protected abstract OrdStatus getPendingOrdStatus();
+	protected abstract ExecType getPendingExecType();
+	protected abstract ExecType getAcceptedExecType();
+
+        public Request(Order order, String clOrdID) {
                 this.order = order;
+                this.clOrdID = clOrdID;
         }
 
         public void accept() {
-                isAccepted = true;
-                acceptImpl();
+		isPending = false;
+		order.updateWithRequest(this);
+                onAccept();
         }
 
         public void reject() {
-                isRejected = true;
-                rejectImpl();
+		isPending = false;
+		order.updateWithRequest(this);
+                onReject();
         }
 
-        public Request getLastPending() {
-                Request request = this;
-                while (request != null && (request.isRejected || request.isAccepted))
-                        request = request.previousRequest;
-                return request;
-        }
+	public boolean isPending() {
+		return isPending;
+	}
 
-        protected void acceptImpl() {}
-        protected void rejectImpl() {}
-        abstract OrdStatus getPendingOrdStatus();
+	public Order getOrder() {
+		return order;
+	}
 }
-
-

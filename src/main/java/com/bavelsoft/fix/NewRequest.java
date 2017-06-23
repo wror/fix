@@ -1,19 +1,32 @@
 package com.bavelsoft.fix;
 
-import static com.bavelsoft.fix.OrdStatus.PendingNew;
+import com.bavelsoft.fix.OrdStatus;
+import com.bavelsoft.fix.ExecType;
+import com.bavelsoft.fix.Request;
+import com.bavelsoft.fix.Order;
 
 public class NewRequest extends Request {
-        public NewRequest(Order order) {
-                super(order);
+        public NewRequest(Order order, String clOrdID) {
+                super(order, clOrdID);
         }
 
-        OrdStatus getPendingOrdStatus() {
-                return PendingNew;
+	@Override
+        protected void onReject() {
+		getOrder().reject();
         }
 
-        protected void rejectImpl() {
-                order.reject();
+	@Override
+        protected OrdStatus getPendingOrdStatus() {
+                return OrdStatus.PendingNew;
+        }
+
+	@Override
+        protected ExecType getPendingExecType() {
+                return ExecType.PendingNew;
+        }
+
+	@Override
+        protected ExecType getAcceptedExecType() {
+                return ExecType.New;
         }
 }
-
-

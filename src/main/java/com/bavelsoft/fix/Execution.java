@@ -1,9 +1,11 @@
 package com.bavelsoft.fix;
 
+import com.bavelsoft.fix.Order;
+
 public class Execution {
+	private Order order;
         private long qty;
         private double price;
-	private Order order;
 
         public Execution(Order order, long qty, double price) {
 		this.order = order;
@@ -12,7 +14,7 @@ public class Execution {
         }
 
         public void cancel() {
-                qty = -qty;
+		qty = -qty;
                 order.fill(this);
         }
 
@@ -23,13 +25,15 @@ public class Execution {
                 order.fill(this);
         }
 
+	public Order getOrder() {
+		return order;
+	}
+
 	public long getQty() {
 		return qty;
 	}
 
-	public double getNewAvgPx(Order order) {
-		double value = qty * price;
-		double orderValue = order.getCumQty()*order.getAvgPx();
-		return (orderValue + value) / (order.getCumQty() + qty);
+	public double getPrice() {
+		return price;
 	}
 }
