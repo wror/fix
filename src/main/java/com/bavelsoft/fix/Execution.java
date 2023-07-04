@@ -2,27 +2,32 @@ package com.bavelsoft.fix;
 
 import com.bavelsoft.fix.Order;
 
+/**
+ * if not supporting corrections, and cancel messages always have the original quantity and price,
+ * then this class does not need to be used
+ */
 public class Execution {
 	private Order order;
         private long qty;
         private double price;
 
-        public Execution(Order order, long qty, double price) {
+        public void init(Order order, long qty, double price) {
 		this.order = order;
                 this.qty = qty;
                 this.price = price;
         }
 
-        public void cancel() {
+        public void bust() {
 		qty = -qty;
-                order.fill(this);
+		//TODO some venues want to call order.cancel(qty) here too
+                order.fill(qty, price);
         }
 
         public void correct(long qty, double price) {
-                cancel();
+                bust();
                 this.qty = qty;
                 this.price = price;
-                order.fill(this);
+                order.fill(qty, price);
         }
 
 	public Order getOrder() {

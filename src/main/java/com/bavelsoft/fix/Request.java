@@ -4,39 +4,54 @@ import com.bavelsoft.fix.OrdStatus;
 import com.bavelsoft.fix.ExecType;
 
 public abstract class Request {
-        private String clOrdID;
-        private Order order;
-	private boolean isPending = true;
+        public final Order<?> order;
 
-        protected void onAccept() {}
-        protected void onReject() {}
-	public long getPendingOrderQty() { return 0; }
-        protected abstract OrdStatus getPendingOrdStatus();
-	protected abstract ExecType getPendingExecType();
-	protected abstract ExecType getAcceptedExecType();
+        private CharSequence clOrdID, origClOrdID;
+	enum Status { Pending, Accepted, None }
+	private Status status;
 
-        public Request(Order order, String clOrdID) {
+        public Request(Order<?> order) {
                 this.order = order;
-                this.clOrdID = clOrdID;
+		reset();
+        }
+
+	public void reset() {
+		status = Status.None;
+		clOrdID = null;
+		origClOrdID = null;
+	}
+
+	public Request init(CharSequence clOrdID) {
+		status = Status.Pending;
+		this.clOrdID = clOrdID;
+		this.origClOrdID = order.replaceRequest.getClOrdID();
+		if (this.origClOrdID == null) {
+			this.origClOrdID = order.newRequest.getClOrdID();
+		}
+		return this;
+	}
+
+        public void reject() {
+		reset();
         }
 
         public void accept() {
-		isPending = false;
-		order.updateWithRequest(this);
-                onAccept();
-        }
-
-        public void reject() {
-		isPending = false;
-		order.updateWithRequest(this);
-                onReject();
+		status = Status.Accepted;
         }
 
 	public boolean isPending() {
-		return isPending;
+		return status == Status.Pending;
 	}
 
-	public Order getOrder() {
-		return order;
+	public boolean isAccepted() {
+		return status == Status.Accepted;
+	}
+
+	public CharSequence getClOrdID() {
+		return clOrdID;
+	}
+
+	public CharSequence getOrigClOrdID() {
+		return origClOrdID;
 	}
 }
