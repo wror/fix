@@ -25,7 +25,7 @@ public class OrderRepo<O extends Order<F>, F> {
 		return order;
 	}
 
-	public void removeIfTerminal(O order) {
+	public void remove(O order) {
 		if (order.getLeavesQty() == 0) {
 			map.remove(order.getOrderID());
 			requestRepo.remove(order.newRequest); //this is the reason OrderRepo depends on RequestRepo and not v.v.

@@ -21,14 +21,14 @@ public class ChildOrderService {
 	class ParentCanceller {
 		public void accept(ChildOrder order) {
 			Order parent = order.getParent();
-			if (childOrderRepo.getChildWorkingQty(parent) == 0) {
+			if (childOrderRepo.getChildrenWorkingQty(parent) == 0) {
 				parent.cancel();
 			}
 		}
 	}
 
 	public void cancelFamily(Order<?> parent) {
-		Collection<ChildOrder> children = childOrderRepo.get(parent);
+		Collection<ChildOrder> children = childOrderRepo.getChildren(parent);
 		if (children.isEmpty()) {
 			parent.cancel();
 			return;
@@ -40,7 +40,7 @@ public class ChildOrderService {
 	}
 
 	public void forceCancelFamily(Order parent) {
-		Collection<ChildOrder> children = childOrderRepo.get(parent);
+		Collection<ChildOrder> children = childOrderRepo.getChildren(parent);
 		for (ChildOrder child : children) {
 			child.cancel();
 		}
