@@ -1,0 +1,98 @@
+package broke.fix.misc;
+
+import broke.fix.OrderComponent;
+import broke.fix.Order;
+import broke.fix.OrderComposite;
+import broke.fix.dto.ExecType;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Queue;
+import java.util.Set;
+import java.util.function.Supplier;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+public class FixRepository<F, H extends OrderComponent<F, H>> {
+	private final static Logger log = LogManager.getLogger();
+	private final SimplePool<H> pool;
+	private final Map<CharSequence, H> orderByClOrdID;
+	private final Map<CharSequence, H> orderByOrderID;
+	private final OrderRepository<F, H> sharedOrderRepo;
+
+	public FixRepository(SimplePool<H> pool, Map<CharSequence, H> orderByClOrdID, Map<CharSequence, H> orderByOrderID, OrderRepository<F, H> sharedOrderRepo) {
+		this.pool = pool;
+		this.orderByClOrdID = orderByClOrdID;
+		this.orderByOrderID = orderByOrderID;
+		this.sharedOrderRepo = sharedOrderRepo;
+	}
+
+	public H acquire() {
+		return pool.acquire();
+	}
+
+	public void release(H order) {
+		pool.release(order);
+	}
+
+	public void addOrder(H order) {
+		order.listeners().add(keyUpdatingListener);
+		orderByClOrdID.put(order.view().getClOrdID(), order);
+		sharedOrderRepo.addOrder(order);
+	}
+
+	public void removeClOrdID(CharSequence origClOrdID) {
+		orderByClOrdID.remove(origClOrdID);
+	}
+
+	public void putClOrdID(CharSequence clOrdID, H order) {
+		orderByClOrdID.put(clOrdID, order);
+	}
+	
+	OrderListener<F, H> keyUpdatingListener = new OrderListener<F, H>() {
+		@Override
+		public void onNewRequest(H order) {
+			orderByOrderID.put(order.view().getOrderID(), order);
+		}
+
+		@Override
+		public void onExecutionReport(H order, ExecType execType, long qty, double px) {
+			if (order.getWorkingQty() <= 0) {
+				log.info("Order {} recycled", order.view().getOrderID());
+				removeOrder(order);
+			}
+		}
+	};
+
+	public void removeOrder(H order) {
+		if (order.view().isRoot() ) {
+			removeClOrdID(order.view().getOptimisticClOrdID());
+		} else if (order.view().getOrderID().isEmpty()) { //DownstreamHandler might've called removeClOrdID already
+			removeClOrdID(order.view().getClOrdID());
+		}
+		orderByOrderID.remove(order.view().getOrderID());
+		sharedOrderRepo.removeOrder(order);
+		pool.release(order);
+	}
+
+	public H getOrder(CharSequence orderID, CharSequence clOrdID) {
+		if (orderID != null) { //Will be null for the first message from downstream for each order
+			H order = orderByOrderID.get(orderID);
+			if (order != null) {
+				return order;
+			}
+		}
+		return getOrderByClOrdIdOrLog(orderID, clOrdID);
+	}
+
+	private H getOrderByClOrdIdOrLog(Object orderID, CharSequence clOrdID) {
+		H order = orderByClOrdID.get(clOrdID);
+		if (order != null) {
+			return order;
+		}
+		log.warn("Couldn't find order {}/{}", orderID, clOrdID);
+		return null;
+	}
+}
