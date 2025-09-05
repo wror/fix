@@ -1,9 +1,9 @@
-package com.bavelsoft.fix;
+package broke.fix.misc;
 
 public class IdGenerator {
 	long lastID;
 
-	public String getClOrdID() {
+	public CharSequence getClOrdID() {
 		return Long.toHexString(getOrderID());
 	}
 
