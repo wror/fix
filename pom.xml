@@ -20,11 +20,10 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.1</version>
+				<version>3.14.0</version>
 				<configuration>
-					<source>1.8</source>
-					<target>1.8</target>
-					<forceJavacCompilerUse>true</forceJavacCompilerUse>
+					<!--<enablePreview>true</enablePreview>-->
+					<release>16</release>
 				</configuration>
 			</plugin>
 		</plugins>

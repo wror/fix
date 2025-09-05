@@ -1,7 +1,8 @@
-package com.bavelsoft.fix;
+package m15xb7.fix.misc;
 
 public class IdGenerator {
 	long lastID;
+	public long incomingTransactTime;
 
 	public String getClOrdID() {
 		return Long.toHexString(getOrderID());
@@ -15,5 +16,9 @@ public class IdGenerator {
 			lastID = now;
 		}
 		return lastID;
+	}
+
+	public long getTime() {
+		return System.currentTimeMillis();
 	}
 }
