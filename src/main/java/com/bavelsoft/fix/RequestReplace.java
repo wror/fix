@@ -9,8 +9,8 @@ public class RequestReplace<F> extends Request {
 	public F pendingFields;
 	public long pendingOrderQty;
 
-        public RequestReplace(Order<F> order) {
-                super(order);
+	public RequestReplace(Order<F> order) {
+		super(order);
 	}
 
 	public long getWorkingQty() {
@@ -23,12 +23,12 @@ public class RequestReplace<F> extends Request {
 	}
 
 	@Override
-        public void accept() {
+	public void accept() {
 		super.accept();
-                ((Order<F>)order).replace(pendingFields, pendingOrderQty);
-        }
+		((Order<F>)order).replace(pendingFields, pendingOrderQty);
+	}
 
-        public OrdStatus getStatus() {
-                return isPending() ? OrdStatus.PendingReplace : null;
-        }
+	public OrdStatus getStatus() {
+		return isPending() ? OrdStatus.PendingReplace : null;
+	}
 }

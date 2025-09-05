@@ -8,27 +8,27 @@ import com.bavelsoft.fix.Order;
  */
 public class Execution {
 	private Order order;
-        private long qty;
-        private double price;
+	private long qty;
+	private double price;
 
-        public void init(Order order, long qty, double price) {
+	public void init(Order order, long qty, double price) {
 		this.order = order;
-                this.qty = qty;
-                this.price = price;
-        }
+		this.qty = qty;
+		this.price = price;
+	}
 
-        public void bust() {
+	public void bust() {
 		qty = -qty;
 		//TODO some venues want to call order.cancel(qty) here too
-                order.fill(qty, price);
-        }
+		order.fill(qty, price);
+	}
 
-        public void correct(long qty, double price) {
-                bust();
-                this.qty = qty;
-                this.price = price;
-                order.fill(qty, price);
-        }
+	public void correct(long qty, double price) {
+		bust();
+		this.qty = qty;
+		this.price = price;
+		order.fill(qty, price);
+	}
 
 	public Order getOrder() {
 		return order;

@@ -4,16 +4,16 @@ import com.bavelsoft.fix.OrdStatus;
 import com.bavelsoft.fix.ExecType;
 
 public abstract class Request {
-        public final Order<?> order;
+	public final Order<?> order;
 
-        private CharSequence clOrdID, origClOrdID;
+	private CharSequence clOrdID, origClOrdID;
 	enum Status { Pending, Accepted, None }
 	private Status status;
 
-        public Request(Order<?> order) {
-                this.order = order;
+	public Request(Order<?> order) {
+		this.order = order;
 		reset();
-        }
+	}
 
 	public void reset() {
 		status = Status.None;
@@ -31,13 +31,13 @@ public abstract class Request {
 		return this;
 	}
 
-        public void reject() {
+	public void reject() {
 		reset();
-        }
+	}
 
-        public void accept() {
+	public void accept() {
 		status = Status.Accepted;
-        }
+	}
 
 	public boolean isPending() {
 		return status == Status.Pending;

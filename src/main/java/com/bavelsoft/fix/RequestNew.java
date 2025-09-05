@@ -7,10 +7,10 @@ import com.bavelsoft.fix.Order;
 
 public class RequestNew extends Request {
 	public RequestNew(Order<?> order) {
-	        super(order);
+		super(order);
 	}
 
-        protected OrdStatus getStatus() {
-                return isAccepted() ? OrdStatus.New : isPending() ? OrdStatus.PendingNew : OrdStatus.Rejected;
-        }
+	protected OrdStatus getStatus() {
+		return isAccepted() ? OrdStatus.New : isPending() ? OrdStatus.PendingNew : OrdStatus.Rejected;
+	}
 }

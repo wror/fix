@@ -11,13 +11,13 @@ public class RequestCancel extends Request {
 	}
 
 	@Override
-        public void accept() {
+	public void accept() {
 		super.accept();
-               	order.cancel();
-        }
+		order.cancel();
+	}
 
-        protected OrdStatus getStatus() {
-                return isPending() ? OrdStatus.PendingCancel : null;
-        }
+	protected OrdStatus getStatus() {
+		return isPending() ? OrdStatus.PendingCancel : null;
+	}
 }
 
