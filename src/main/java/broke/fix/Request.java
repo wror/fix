@@ -29,12 +29,12 @@ public abstract class Request<F extends FixFields> {
 			log.warn("Duplicate request on {}", order);
 		}
 		status = Status.Pending;
-		this.clOrdID.setLength(0);
 		this.clOrdID.append(clOrdID != null ? clOrdID : order.idgen.getClOrdID());
 	}
 
 	protected void reset() {
 		status = null;
+		this.clOrdID.setLength(0);
 	}
 
 	protected void accept() { //protected b/c callers should use cancel() on the order instead of cancelRequest.accept()

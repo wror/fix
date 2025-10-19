@@ -17,6 +17,9 @@ import java.util.Collection;
 import java.util.ArrayList;
 import java.util.function.Consumer;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import static java.util.Arrays.asList;
 import static java.util.Collections.addAll;
 import static java.lang.Long.max;
@@ -28,6 +31,7 @@ import static broke.fix.dto.ExecType.Replaced;
 import static broke.fix.dto.ExecType.Restated;
 
 public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
+	private final static Logger log = LogManager.getLogger();
 	private OrderComposite parent;
 	private F fields;
 	private long cumQty, origWorkingQty, transactTime, orderTime, internalOrderID;
@@ -145,7 +149,13 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 		if (parent != null) {
 			parent.addWorkingQtyChange(getWorkingQty() - origWorkingQty); //can be negative
 		}
-		listeners.forEach(listenerCall);
+		for (OrderListener<F, Order<F>> listener : listeners) {
+			try {
+				listenerCall.accept(listener);
+			} catch (RuntimeException e) {
+				log.warn("Listener exception", e);
+			}
+		}
 	}
 
 	@Override

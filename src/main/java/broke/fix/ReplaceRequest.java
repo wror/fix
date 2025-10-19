@@ -57,10 +57,16 @@ public class ReplaceRequest<F extends FixFields> extends Request<F> {
 	}
 
 	public long getQty() {
+		if (!isPending()) {
+			return 0;
+		}
 		return pendingFields.getOrderQty();
 	}
 
 	public F getFields() {
+		if (!isPending()) {
+			return null;
+		}
 		return pendingFields;
 	}
 }
