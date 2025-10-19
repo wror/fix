@@ -32,7 +32,7 @@ public class FixTestBase {
 	FixRepository childOrderRepo = new FixRepository<>(fieldsPool, orderPool, new HashMap(), new HashMap(), sharedOrderRepo);
 	UpstreamPublisher toUpstream = new UpstreamPublisher();
 	UpstreamHandler fromUpstream = new UpstreamHandler(incoming, idgen, toUpstream, new HashSet<>(), parentalRepo, orderPool, validators);
-	DownstreamHandler fromDownstream = new DownstreamHandler(incoming, idgen, childOrderRepo);
+	DownstreamHandler fromDownstream = new DownstreamHandler(incoming, childOrderRepo);
 
 	Message lastFromUpstream() {
 		Message e = toUpstream.queue.pop();

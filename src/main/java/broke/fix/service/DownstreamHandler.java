@@ -5,8 +5,6 @@ import broke.fix.Request;
 import broke.fix.ReplaceRequest;
 import broke.fix.dto.CxlRejResponseTo;
 import broke.fix.dto.ExecType;
-import broke.fix.misc.Execution;
-import broke.fix.misc.ExecutionRepository;
 import broke.fix.misc.FixFields;
 import broke.fix.misc.IdGenerator;
 import broke.fix.misc.IncomingContext;
@@ -24,26 +22,17 @@ import static org.apache.logging.log4j.util.Unbox.box;
 
 public class DownstreamHandler<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();
-	private final FixRepository<F, Order<F>> repo;
-	private final IncomingContext incoming;
-	private final IdGenerator idgen;
-	private ExecutionRepository execRepo;
+	final IncomingContext incoming;
+	final FixRepository<F, Order<F>> repo;
 
 	@Inject
-	public DownstreamHandler(IncomingContext incoming, IdGenerator idgen, FixRepository<F, Order<F>> repo) {
+	public DownstreamHandler(IncomingContext incoming, FixRepository<F, Order<F>> repo) {
 		this.incoming = incoming;
-		this.idgen = idgen;
 		this.repo = repo;
-	}
-
-	@Inject
-	public void setExecutionRepo(ExecutionRepository execRepo) {
-		this.execRepo = execRepo;
 	}
 
 	public void handleExecutionReport(ExecType execType, long transactTime, CharSequence downstreamOrderID,
 			CharSequence clOrdID, CharSequence origClOrdID,
-			CharSequence execID, CharSequence execRefID,
 			long lastQty, double lastPx) {
 		incoming.transactTime = transactTime;
 		Order<F> order = repo.getOrder(downstreamOrderID, clOrdID);
@@ -58,25 +47,13 @@ public class DownstreamHandler<F extends FixFields> {
 				order.newRequest.accept(downstreamOrderID);
 				repo.removeClOrdID(order.view().getClOrdID()); //now we don't need it in the repo, and we may not have a reference to remove it later, after replaces
 				break;
+			case TradeCancel:
 			case Trade:
 				if (order.newRequest.isPending()) {
 					order.newRequest.accept(downstreamOrderID);
 					repo.removeClOrdID(order.view().getClOrdID());
 				}
 				order.fill(lastQty, lastPx);
-				if (execRepo != null) {
-					execRepo.addExecution(execID, execRepo.acquire().init(order, lastQty, lastPx));
-				}
-				break;
-			case TradeCorrect:
-				execRepo.getExecution(execRefID).correct(lastQty, lastPx);
-				break;
-			case TradeCancel:
-				if (execRepo == null) {
-					order.fill(-lastQty, lastPx);
-				} else {
-					execRepo.getExecution(execRefID).bust();
-				}
 				break;
 			case Replaced:
 				logOfNonMatching(clOrdID, order.replaceRequest);

@@ -20,7 +20,7 @@ public class NewRequest<F extends FixFields> extends Request<F> {
 	protected void init(CharSequence clOrdID) {
 		super.init(clOrdID);
 		this.orderID.setLength(0);
-		//order.init() calls order.end() as well calling here, we don't call order.end() again here
+		//order.init() calls order.end() as well calling here, so we don't call order.end() again here
 	}
 
 	public void accept(CharSequence orderID) {
@@ -31,11 +31,10 @@ public class NewRequest<F extends FixFields> extends Request<F> {
 		order.end(l->l.onExecutionReport(order, ExecType.New, 0, 0));
 	}
 
-
 	@Override
 	public void reject() {
 		super.reject();
-		order.terminate(OrdStatus.Rejected, ExecType.Rejected); //calls order.end(), so don't call order.end() again here
+		order.terminate(OrdStatus.Rejected, ExecType.Rejected); //calls order.end(), so we don't call order.end() again here
 	}
 
 	@Override

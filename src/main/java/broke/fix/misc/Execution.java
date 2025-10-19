@@ -8,9 +8,9 @@ import broke.fix.Order;
  * then this class does not need to be used
  */
 public class Execution {
-	protected Order order;
-	protected long qty;
-	protected double price;
+	private Order order;
+	private long qty;
+	private double price;
 
 	public Execution init(Order order, long qty, double price) {
 		this.order = order;

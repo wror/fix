@@ -18,7 +18,6 @@ import javax.inject.Inject;
 
 import java.util.Collection;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -73,7 +72,7 @@ public class UpstreamHandler<F extends FixFields> {
 				}
 			}
 			order.listeners.add(upstreamClOrdIDListener);
-			order.newRequest.accept();
+			handleNewOrder(order, composite);
 			repo.addOrder(composite);
 		} catch (RuntimeException e) {
 			repo.release(composite);
@@ -82,6 +81,10 @@ public class UpstreamHandler<F extends FixFields> {
 			log.warn("Rejected because of exception: {}", incoming.responseText); //TODO why not seeing this in tests?
 			publisher.onExecutionReport(null, ExecType.Rejected, 0, 0);
 		}
+	}
+
+	protected void handleNewOrder(Order<F> order, OrderComposite<F> composite) {
+		order.newRequest.accept();
 	}
 
 	public void handleReplaceRequest(CharSequence orderID, CharSequence origClOrdID, CharSequence clOrdID, F fields) {

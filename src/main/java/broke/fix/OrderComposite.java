@@ -19,9 +19,12 @@ import static java.util.Collections.unmodifiableCollection;
 
 /*
  * When an order could have child orders, its Order object should be wrapped by an instance of this class.
+ *
+ * That's the major difference between this and the standard composite pattern:
+ *  OrderComposite composes not only an OrderComponent for each child order, but also a single extra Order object for its own order-nature.
  */
 public class OrderComposite<F extends FixFields> extends OrderComponent<F, OrderComposite<F>> {
-	public final Collection<OrderListener<F, OrderComposite<F>>> listeners = new ArrayList<>();
+	public final Collection<OrderListener<F, OrderComposite<F>>> listeners = new ArrayList<>(); //TODO confirm no garbage, Order, here, next line
 	private final Collection<OrderComponent> children = new ArrayList<>();
 	private final OrderCompositeListener<F> orderCompositeListener = new OrderCompositeListener<>(this);
 	private final IncomingContext incoming;

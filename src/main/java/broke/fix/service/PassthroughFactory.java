@@ -12,10 +12,6 @@ import broke.fix.misc.SimplePool;
 
 import javax.inject.Inject;
 
-import java.util.ArrayDeque;
-import java.util.Map;
-import java.util.HashMap;
-
 public class PassthroughFactory<F extends FixFields> {
 	private final IdGenerator idgen;
 	private final SimplePool<PassthroughOrderListener> listenerPool;
@@ -29,7 +25,10 @@ public class PassthroughFactory<F extends FixFields> {
 		this.repo = exchangeOrderRepo;
 		this.exchangeOrderPublisher = exchangeOrderPublisher;
 	}
-
+	
+	/*
+	 * Callers need to pass in the unwrapped Order of the client order, because the lifecyle of its requests are tied to the exchange order's requests.
+	 */
 	public void slicePassthrough(Order clientOrder, OrderComposite composite, F sliceFields) {
 		Order<F> exchangeOrder = repo.acquire().init(idgen.getClOrdID(), sliceFields, listenerPool.acquire().to(clientOrder), exchangeOrderPublisher);
 		repo.addOrder(exchangeOrder);
@@ -54,6 +53,7 @@ public class PassthroughFactory<F extends FixFields> {
 					clientOrder.newRequest.reject();
 					break;
 				case Trade:
+				case TradeCancel:
 					clientOrder.fill(qty, px);
 					break;
 				case Replaced:

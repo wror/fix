@@ -2,11 +2,11 @@ package broke.fix;
 
 import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.ExecType;
+import broke.fix.dto.OrdStatus;
 import broke.fix.misc.FixFields;
 import broke.fix.misc.IncomingContext;
 import broke.fix.misc.IdGenerator;
 import broke.fix.misc.OrderListener;
-import broke.fix.dto.OrdStatus;
 import broke.fix.misc.NotEnoughQtyException;
 import broke.fix.CancelRequest;
 import broke.fix.NewRequest;
@@ -23,12 +23,8 @@ import org.apache.logging.log4j.Logger;
 import static java.util.Arrays.asList;
 import static java.util.Collections.addAll;
 import static java.lang.Long.max;
+
 import static broke.fix.dto.ExecInst.Suspend;
-import static broke.fix.dto.ExecType.Canceled;
-import static broke.fix.dto.ExecType.DoneForDay;
-import static broke.fix.dto.ExecType.New;
-import static broke.fix.dto.ExecType.Replaced;
-import static broke.fix.dto.ExecType.Restated;
 
 public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 	private final static Logger log = LogManager.getLogger();
@@ -106,7 +102,7 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 			orderTime = incoming.getTime();
 		}
 		transactTime = incoming.transactTime;
-		end(l->l.onExecutionReport(this, Replaced, 0, 0));
+		end(l->l.onExecutionReport(this, ExecType.Replaced, 0, 0));
 
 		//separate transaction
 		if (cancelRequest.isPending() && cumQty >= fields.getOrderQty()) {

@@ -16,4 +16,5 @@ public interface FixFields {
 	}
 	default long getOrigOrdModTime() { return 0; }
 	default boolean hasExecInst(ExecInst i) { return false; }
+	default CharSequence getExDestination() { return null; }
 }
