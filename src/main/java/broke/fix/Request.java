@@ -24,6 +24,7 @@ public abstract class Request<F extends FixFields> {
 	public abstract OrdStatus getStatus();
 
 	protected void init(CharSequence clOrdID) {
+		order.begin();
 		if (isPending()) {
 			log.warn("Duplicate request on {}", order);
 		}
@@ -37,6 +38,7 @@ public abstract class Request<F extends FixFields> {
 	}
 
 	protected void accept() { //protected b/c callers should use cancel() on the order instead of cancelRequest.accept()
+		order.begin();
 		if (!isPending()) {
 			log.warn("Accept of {} request on {}", status, order);
 		}
@@ -47,6 +49,7 @@ public abstract class Request<F extends FixFields> {
 	}
 
 	public void reject() {
+		order.begin();
 		if (!isPending()) {
 			log.warn("Reject of {} request on {}", status, order);
 		}

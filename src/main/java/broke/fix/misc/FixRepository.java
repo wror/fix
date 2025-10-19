@@ -17,24 +17,30 @@ import org.apache.logging.log4j.Logger;
 
 public class FixRepository<F, H extends OrderComponent<F, H>> {
 	private final static Logger log = LogManager.getLogger();
-	private final SimplePool<H> pool;
+	private final SimplePool<F> fieldsPool;
+	private final SimplePool<H> orderPool;
 	private final Map<CharSequence, H> orderByClOrdID;
 	private final Map<CharSequence, H> orderByOrderID;
 	private final OrderRepository<F, H> sharedOrderRepo;
 
-	public FixRepository(SimplePool<H> pool, Map<CharSequence, H> orderByClOrdID, Map<CharSequence, H> orderByOrderID, OrderRepository<F, H> sharedOrderRepo) {
-		this.pool = pool;
+	public FixRepository(SimplePool<F> fieldsPool, SimplePool<H> orderPool, Map<CharSequence, H> orderByClOrdID, Map<CharSequence, H> orderByOrderID, OrderRepository<F, H> sharedOrderRepo) {
+		this.fieldsPool = fieldsPool;
+		this.orderPool = orderPool;
 		this.orderByClOrdID = orderByClOrdID;
 		this.orderByOrderID = orderByOrderID;
 		this.sharedOrderRepo = sharedOrderRepo;
 	}
 
 	public H acquire() {
-		return pool.acquire();
+		return orderPool.acquire();
 	}
 
 	public void release(H order) {
-		pool.release(order);
+		if (order == null) {
+			return;
+		}
+		orderPool.release(order);
+		fieldsPool.release((F)order.view().getFields()); //TODO why is this cast nesc?
 	}
 
 	public void addOrder(H order) {
@@ -74,7 +80,7 @@ public class FixRepository<F, H extends OrderComponent<F, H>> {
 		}
 		orderByOrderID.remove(order.view().getOrderID());
 		sharedOrderRepo.removeOrder(order);
-		pool.release(order);
+		release(order);
 	}
 
 	public H getOrder(CharSequence orderID, CharSequence clOrdID) {

@@ -48,7 +48,6 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 
 	public Order<F> init(CharSequence clOrdID, F fields, OrderListener<F, Order<F>>... listeners) {
 		internalOrderID = idgen.getOrderID();
-		newRequest.init(clOrdID);
 		replaceRequest.reset();
 		cancelRequest.reset();
 		this.fields = fields;
@@ -59,6 +58,7 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 		}
 		transactTime = incoming.transactTime;
 		orderTime = incoming.getTime();
+		newRequest.init(clOrdID);
 		end(l->l.onNewRequest(this));
 		return this;
 	}
@@ -92,7 +92,7 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 
 	public void replace(F fields) throws NotEnoughQtyException {
 		begin();
-		if (parent != null && fields.getOrderQty() - this.fields.getOrderQty() > parent.getAvailableQty()) { //callers should check this
+		if (!canReplace(fields)) { //callers should check this
 			throw new NotEnoughQtyException();
 		}
 		this.fields = fields;
@@ -108,6 +108,10 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 		if (cancelRequest.isPending() && cumQty >= fields.getOrderQty()) {
 			cancelRequest.reject();
 		}
+	}
+
+	public boolean canReplace(F fields) {
+		return parent == null || fields.getOrderQty() - this.fields.getOrderQty() <= parent.getAvailableQty();
 	}
 
 	public void cancel() {

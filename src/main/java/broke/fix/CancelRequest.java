@@ -13,14 +13,12 @@ public class CancelRequest<F extends FixFields> extends Request<F> {
 
 	@Override
 	protected void init(CharSequence clOrdID) {
-		order.begin();
 		super.init(clOrdID);
 		order.end(l->l.onCancelRequest(order));
 	}
 	
 	@Override
 	public void reject() {
-		order.begin();
 		super.reject();
 		order.end(l->l.onCancelReject(order, CxlRejReason.TooLateToCancel));
 	}

@@ -17,7 +17,6 @@ public class ReplaceRequest<F extends FixFields> extends Request<F> {
 	}
 
 	protected void init(CharSequence clOrdID, F newFields) {
-		order.begin();
 		if (isPending()) {
 			order.end(l->l.onReplaceReject(order, CxlRejReason.AlreadyPendingCancelOrReplace));
 			return;
@@ -40,18 +39,16 @@ public class ReplaceRequest<F extends FixFields> extends Request<F> {
 
 	@Override
 	public void reject() {
-		order.begin();
 		super.reject();
 		order.end(l->l.onReplaceReject(order, CxlRejReason.Other));
 	}
 
 	@Override
 	public void accept() {
-		order.begin();
-		order.replace(pendingFields);
-		//order.replace() calls order.end(), so we don't do it again here
-		//since order.replace() could theoretically throw, better to mutate the request only afterwards...
-		super.accept();
+		if (order.canReplace(pendingFields)) {
+			super.accept();
+		}
+		order.replace(pendingFields); //calls order.end(), so don't call order.end() again here
 	}
 
 	@Override

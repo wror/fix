@@ -95,18 +95,19 @@ public class FixTest {
 	}
 
 	Collection<Validator<UpstreamFields>> validators = asList(new OrderQtyValidator());
+	SimplePool<UpstreamFields> fieldsPool = new SimplePool<>(new ArrayDeque<>(), ()->new UpstreamFields(), 10);
 	SimplePool parentalPool = new SimplePool<>(new ArrayDeque<>(), ()->new OrderComposite(incoming), 10);
 	OrderRepository sharedOrderRepo = new SimpleOrderRepository();
-	FixRepository parentalRepo = new FixRepository<>(parentalPool, new HashMap(), new HashMap(), sharedOrderRepo);
+	FixRepository parentalRepo = new FixRepository<>(fieldsPool, parentalPool, new HashMap(), new HashMap(), sharedOrderRepo);
 	SimplePool orderPool = new SimplePool<>(new ArrayDeque<>(), ()->new Order(incoming, idgen), 10);
-	FixRepository childOrderRepo = new FixRepository<>(orderPool, new HashMap(), new HashMap(), sharedOrderRepo);
+	FixRepository childOrderRepo = new FixRepository<>(fieldsPool, orderPool, new HashMap(), new HashMap(), sharedOrderRepo);
 	UpstreamPublisher toUpstream = new UpstreamPublisher();
 	UpstreamHandler fromUpstream = new UpstreamHandler(incoming, idgen, toUpstream, new HashSet<>(), parentalRepo, orderPool, validators);
 	DownstreamHandler fromDownstream = new DownstreamHandler(incoming, idgen, childOrderRepo);
 
 	@Test
 	public void accept() {
-		UpstreamFields f = new UpstreamFields();
+		UpstreamFields f = fieldsPool.acquire();
 		f.orderQty = 10;
 		f.price = 1.2;
 		fromUpstream.handleNewRequest("c1", f, 1);

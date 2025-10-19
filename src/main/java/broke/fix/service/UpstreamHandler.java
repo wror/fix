@@ -78,6 +78,8 @@ public class UpstreamHandler<F extends FixFields> {
 		} catch (RuntimeException e) {
 			repo.release(composite);
 			pool.release(order);
+			incoming.responseText = e.getMessage();
+			log.warn("Rejected because of exception: {}", incoming.responseText); //TODO why not seeing this in tests?
 			publisher.onExecutionReport(null, ExecType.Rejected, 0, 0);
 		}
 	}

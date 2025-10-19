@@ -73,8 +73,9 @@ public class SbeExampleTest {
 		public double getPrice() { return price; }
 	}
 	Collection<Validator<UpstreamFields>> validators = asList(new OrderQtyValidator());
+	SimplePool<UpstreamFields> fieldsPool = new SimplePool<>(new ArrayDeque<>(), ()->new UpstreamFields(), 10);
 	SimplePool parentalPool = new SimplePool<>(new ArrayDeque<>(), ()->new OrderComposite(incoming), 10);
-	FixRepository parentalRepo = new FixRepository<>(parentalPool, new HashMap(), new HashMap(), new FixTest.SimpleOrderRepository());
+	FixRepository parentalRepo = new FixRepository<>(fieldsPool, parentalPool, new HashMap(), new HashMap(), new FixTest.SimpleOrderRepository());
 	SimplePool orderPool = new SimplePool<>(new ArrayDeque<>(), ()->new Order(incoming, idgen), 10);
 	UpstreamPublisher toUpstream = new UpstreamPublisher();
 	UpstreamHandler fromUpstream = new UpstreamHandler(incoming, idgen, toUpstream, new HashSet<>(), parentalRepo, orderPool, validators);
@@ -88,7 +89,7 @@ public class SbeExampleTest {
 		en.orderQty(100);
 		en.price(1.2);
 		
-		UpstreamFields f = new UpstreamFields();
+		UpstreamFields f = fieldsPool.acquire();
 		f.orderQty = de.orderQty();
 		f.price = de.price();
 		fromUpstream.handleNewRequest("c1", f, 1);
