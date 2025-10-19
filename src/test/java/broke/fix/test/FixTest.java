@@ -1,113 +1,15 @@
 package broke.fix.test;
 
-import broke.fix.Order;
-import broke.fix.OrderComponent;
-import broke.fix.OrderComposite;
-import broke.fix.service.DownstreamHandler;
-import broke.fix.dto.CxlRejReason;
-import broke.fix.dto.CxlRejResponseTo;
-import broke.fix.dto.ExecInst;
-import broke.fix.dto.ExecType;
-import broke.fix.misc.FixFields;
-import broke.fix.misc.IncomingContext;
-import broke.fix.misc.IdGenerator;
-import broke.fix.misc.OrderListener;
-import broke.fix.misc.OrderQtyValidator;
-import broke.fix.misc.OrderRepository;
 import broke.fix.dto.OrdStatus;
-import broke.fix.misc.FixRepository;
-import broke.fix.misc.SimplePool;
-import broke.fix.misc.Validator;
-import broke.fix.service.UpstreamHandler;
 
 import org.junit.jupiter.api.Test;
-import java.util.ArrayDeque;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static java.util.Arrays.asList;
 
-public class FixTest {
-	IdGenerator idgen = new IdGenerator();
-	IncomingContext incoming = new IncomingContext();
-	record Message(ExecType execType, CxlRejResponseTo rejType, OrdStatus ordStatus, long cumQty, long leavesQty, long lastShares, CharSequence clOrdID, CharSequence origClOrdID) {
-		Message(CxlRejResponseTo rejType, OrdStatus ordStatus, CharSequence clOrdID, CharSequence origClOrdID) {
-			this(null, rejType, ordStatus, -1, -1, -1, clOrdID, origClOrdID);
-		}
-
-		Message(ExecType execType, OrdStatus ordStatus, long cumQty, long leavesQty, long lastShares, CharSequence clOrdID, CharSequence origClOrdID) {
-			this(execType, null, ordStatus, cumQty, leavesQty, lastShares, clOrdID, origClOrdID);
-		}
-	}
-	class UpstreamPublisher implements OrderListener<UpstreamFields, OrderComposite<UpstreamFields>> {
-		ArrayDeque<Message> queue = new ArrayDeque<>();
-		
-		@Override
-		public void onExecutionReport(OrderComposite<UpstreamFields> order, ExecType execType, long qty, double px) {
-			Order.View v = order.view();
-			queue.add(new Message(execType, v.getOrdStatus(), v.getCumQty(), v.getLeavesQty(), qty, v.getClOrdID(), null));
-		}
-
-		@Override
-		public void onCancelReject(OrderComposite<UpstreamFields> order, CxlRejReason rejectReason) {
-			Order.View v = order.view();
-			queue.add(new Message(CxlRejResponseTo.Cancel, v.getOrdStatus(), order.getCancelClOrdID(), v.getClOrdID()));
-		}
-
-		@Override
-		public void onReplaceReject(OrderComposite<UpstreamFields> order, CxlRejReason rejectReason) {
-			Order.View v = order.view();
-			queue.add(new Message(CxlRejResponseTo.Replace, v.getOrdStatus(), order.getReplaceClOrdID(), v.getClOrdID()));
-		}
-	}
-
-	static class UpstreamFields implements FixFields {
-		double price;
-		long orderQty;
-		public long getOrderQty() { return orderQty; }
-		public double getPrice() { return price; }
-	}
-
-	static class DownstreamFields implements FixFields {
-		long orderQty;
-		public long getOrderQty() { return orderQty; }
-	}
-
-	static class SimpleOrderRepository implements OrderRepository {
-		private HashMap<Long, OrderComponent> map = new HashMap<>();
-
-		@Override
-		public void addOrder(OrderComponent order) {
-			map.put(order.view().getInternalOrderID(), order);
-		}
-
-		@Override
-		public void removeOrder(OrderComponent order) {
-			map.remove(order.view().getInternalOrderID());
-		}
-
-		@Override
-		public OrderComponent getOrder(long orderID) {
-			return map.get(orderID);
-		}
-	}
-
-	Collection<Validator<UpstreamFields>> validators = asList(new OrderQtyValidator());
-	SimplePool<UpstreamFields> fieldsPool = new SimplePool<>(new ArrayDeque<>(), ()->new UpstreamFields(), 10);
-	SimplePool parentalPool = new SimplePool<>(new ArrayDeque<>(), ()->new OrderComposite(incoming), 10);
-	OrderRepository sharedOrderRepo = new SimpleOrderRepository();
-	FixRepository parentalRepo = new FixRepository<>(fieldsPool, parentalPool, new HashMap(), new HashMap(), sharedOrderRepo);
-	SimplePool orderPool = new SimplePool<>(new ArrayDeque<>(), ()->new Order(incoming, idgen), 10);
-	FixRepository childOrderRepo = new FixRepository<>(fieldsPool, orderPool, new HashMap(), new HashMap(), sharedOrderRepo);
-	UpstreamPublisher toUpstream = new UpstreamPublisher();
-	UpstreamHandler fromUpstream = new UpstreamHandler(incoming, idgen, toUpstream, new HashSet<>(), parentalRepo, orderPool, validators);
-	DownstreamHandler fromDownstream = new DownstreamHandler(incoming, idgen, childOrderRepo);
-
+public class FixTest extends FixTestBase {
 	@Test
 	public void accept() {
-		UpstreamFields f = fieldsPool.acquire();
+		Fields.Upstream f = fieldsPool.acquire();
 		f.orderQty = 10;
 		f.price = 1.2;
 		fromUpstream.handleNewRequest("c1", f, 1);
@@ -116,16 +18,10 @@ public class FixTest {
 
 	@Test
 	public void reject() {
-		UpstreamFields f = new UpstreamFields();
+		Fields.Upstream f = new Fields.Upstream();
 		f.orderQty = 0;
 		f.price = 1.2;
 		fromUpstream.handleNewRequest("c1", f, 1);
 		assertEquals(OrdStatus.Rejected, lastFromUpstream().ordStatus());
-	}
-
-	private Message lastFromUpstream() {
-		Message e = toUpstream.queue.pop();
-		System.err.println(e);
-		return e;
 	}
 }
