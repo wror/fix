@@ -68,9 +68,6 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 		double totalValue = qty * px + cumQty * avgPx;
 		avgPx = totalValue / (qty + cumQty);
 		cumQty += qty;
-		if (cumQty >= fields.getOrderQty()) {
-			terminalOrdStatus = OrdStatus.Filled;
-		}
 		if (parent != null) {
 			parent.fill(qty, px);
 		}
@@ -78,16 +75,7 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 		end(l->l.onExecutionReport(this, ExecType.Trade, qty, px));
 
 		//separate transaction
-		if (replaceRequest.isPending() && cumQty >= replaceRequest.getQty() && replaceRequest.getQty() != fields.getOrderQty()) {
-			replaceRequest.accept(); // https://www.onixs.biz/fix-dictionary/4.2/app_d12.html
-		} else if (cumQty >= fields.getOrderQty()) {
-			if (cancelRequest.isPending()) {
-				cancelRequest.reject();
-			}
-			if (replaceRequest.isPending()) {
-				replaceRequest.reject();
-			}
-		}
+		handleReplaceRequestIfFilled();
 	}
 
 	public void replace(F fields) throws NotEnoughQtyException {
@@ -96,17 +84,25 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 			throw new NotEnoughQtyException();
 		}
 		this.fields = fields;
-		if (cumQty >= fields.getOrderQty()) {
-			terminalOrdStatus = OrdStatus.Filled;
-		} else {
+		if (cumQty < fields.getOrderQty()) {
 			orderTime = incoming.getTime();
 		}
 		transactTime = incoming.transactTime;
 		end(l->l.onExecutionReport(this, ExecType.Replaced, 0, 0));
 
 		//separate transaction
-		if (cancelRequest.isPending() && cumQty >= fields.getOrderQty()) {
-			cancelRequest.reject();
+		//relevant for this being an unsolicted replace
+		handleReplaceRequestIfFilled();
+	}
+
+	private void handleReplaceRequestIfFilled() {
+		//for flexibility, we'll let the publishing layer decide what to do with a pending cancel, in all cases
+		if (replaceRequest.isPending() && cumQty >= replaceRequest.getQty()) {
+			if (replaceRequest.getQty() != fields.getOrderQty()) {
+				replaceRequest.accept(); // https://www.onixs.biz/fix-dictionary/4.2/app_d12.html
+			} else if (cumQty >= fields.getOrderQty()) {
+				replaceRequest.reject();
+			}
 		}
 	}
 
@@ -123,18 +119,14 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 	}
 
 	protected void terminate(final OrdStatus status, final ExecType execType) {
+		if (replaceRequest.isPending()) {
+			replaceRequest.reject();
+		}
+		//separate transaction
 		begin();
 		terminalOrdStatus = status;
 		transactTime = incoming.transactTime;
 		end(l->l.onExecutionReport(this, execType, 0, 0));
-
-		//separate transaction
-		if (cancelRequest.isPending()) {
-			cancelRequest.accept();
-		}
-		if (replaceRequest.isPending()) {
-			replaceRequest.reject();
-		}
 	}
 
 	protected void begin() {
@@ -193,12 +185,13 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 
 		public OrdStatus getOrdStatus() {
 			return
-				cancelRequest.isPending()   ? cancelRequest.getStatus() :
-				replaceRequest.isPending()  ? replaceRequest.getStatus() :
-				terminalOrdStatus != null   ? terminalOrdStatus :
-				fields.hasExecInst(Suspend) ? OrdStatus.Suspended :
-				cumQty > 0                  ? OrdStatus.PartiallyFilled :
-			                                      newRequest.getStatus();
+				terminalOrdStatus != null      ? terminalOrdStatus :
+				cancelRequest.isPending()      ? cancelRequest.getStatus() :
+				replaceRequest.isPending()     ? replaceRequest.getStatus() :
+				fields.hasExecInst(Suspend)    ? OrdStatus.Suspended :
+				cumQty >= fields.getOrderQty() ? OrdStatus.Filled :
+				cumQty > 0                     ? OrdStatus.PartiallyFilled :
+			                                         newRequest.getStatus();
 		}
 
 		public F getFields() {

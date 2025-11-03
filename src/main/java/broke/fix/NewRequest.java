@@ -24,6 +24,7 @@ public class NewRequest<F extends FixFields> extends Request<F> {
 	}
 
 	public void accept(CharSequence orderID) {
+		order.begin();
 		super.accept();
 		if (orderID != null) {
 			this.orderID.append(orderID);

@@ -14,8 +14,8 @@ public abstract class Request<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();
 	protected final Order<F> order;
 	protected StringBuffer clOrdID = new StringBuffer(16);
-	private enum Status { Pending, Accepted, Rejected }
-	private Status status;
+	protected enum Status { Pending, Accepted, Rejected }
+	protected Status status;
 
 	public Request(Order<F> order) {
 		this.order = order;
@@ -27,9 +27,10 @@ public abstract class Request<F extends FixFields> {
 		order.begin();
 		if (isPending()) {
 			log.warn("Duplicate request on {}", order);
+		} else {
+			this.clOrdID.append(clOrdID != null ? clOrdID : order.idgen.getClOrdID());
 		}
 		status = Status.Pending;
-		this.clOrdID.append(clOrdID != null ? clOrdID : order.idgen.getClOrdID());
 	}
 
 	protected void reset() {
@@ -38,7 +39,6 @@ public abstract class Request<F extends FixFields> {
 	}
 
 	protected void accept() { //protected b/c callers should use cancel() on the order instead of cancelRequest.accept()
-		order.begin();
 		if (!isPending()) {
 			log.warn("Accept of {} request on {}", status, order);
 		}
@@ -48,7 +48,7 @@ public abstract class Request<F extends FixFields> {
 		this.clOrdID = replacedClOrdID; //so its memory can be used next time
 	}
 
-	public void reject() {
+	protected void reject() {
 		order.begin();
 		if (!isPending()) {
 			log.warn("Reject of {} request on {}", status, order);

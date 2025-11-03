@@ -64,6 +64,7 @@ public class FixRepository<F, H extends OrderComponent<F, H>> {
 
 		@Override
 		public void onExecutionReport(H order, ExecType execType, long qty, double px) {
+			//TODO give flexibility about whether to support amending up filled orders
 			if (order.getWorkingQty() <= 0) {
 				log.info("Order {} recycled", order.view().getOrderID());
 				removeOrder(order);

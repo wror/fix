@@ -18,24 +18,30 @@ public class ReplaceRequest<F extends FixFields> extends Request<F> {
 
 	protected void init(CharSequence clOrdID, F newFields) {
 		if (isPending()) {
-			order.end(l->l.onReplaceReject(order, CxlRejReason.AlreadyPendingCancelOrReplace));
+			reject(CxlRejReason.AlreadyPendingCancelOrReplace);
 			return;
 		}
 		if (newFields.getOrigOrdModTime() > 0 && newFields.getOrigOrdModTime() != order.view().getTransactTime()) { //TODO check again before accepting?
-			order.end(l->l.onReplaceReject(order, CxlRejReason.OrigOrdModTimeNotTransactTime));
+			reject(CxlRejReason.OrigOrdModTimeNotTransactTime);
 			return;
 		}
 
 		//don't support outgoing "blind" replace request
 		//since we only key repo by a single clordid per order, that would prevent supporting the more important blind cancel request
 		if (!order.view().isRoot() && !order.newRequest.getClOrdID().isEmpty() && order.newRequest.getOrderID().isEmpty()) {
-			order.end(l->l.onReplaceReject(order, CxlRejReason.Other));
+			reject(CxlRejReason.Other);
 			return;
 		}
 		super.init(clOrdID);
 		this.pendingFields = newFields;
 		order.end(l->l.onReplaceRequest(order));
 	}
+
+	private void reject(CxlRejReason reason) {
+		status = Status.Rejected;
+		order.end(l->l.onReplaceReject(order, reason));
+	}
+		
 
 	@Override
 	public void reject() {
@@ -45,6 +51,7 @@ public class ReplaceRequest<F extends FixFields> extends Request<F> {
 
 	@Override
 	public void accept() {
+		order.begin();
 		if (order.canReplace(pendingFields)) {
 			super.accept();
 		}
