@@ -1,6 +1,7 @@
 package broke.fix.service;
 
 import broke.fix.Order;
+import broke.fix.OrderComponent;
 import broke.fix.OrderComposite;
 import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.ExecType;
@@ -33,6 +34,19 @@ public class PassthroughFactory<F extends FixFields> {
 		Order<F> exchangeOrder = repo.acquire().init(idgen.getClOrdID(), sliceFields, listenerPool.acquire().to(clientOrder), exchangeOrderPublisher);
 		repo.addOrder(exchangeOrder);
 		composite.addChild(exchangeOrder);
+	}
+
+	public void requestCancelOfPassthrough(OrderComposite<?> composite) {
+		for (OrderComponent<?, ?> child : composite.getChildren()) {
+			for (OrderListener listener : child.listeners()) {
+				if (listener instanceof PassthroughFactory<?>.PassthroughOrderListener) {
+					child.listeners().remove(listener);
+					child.requestCancel();
+					return;
+				}
+			}
+		}
+		//TODO indicate there is no passthrough slice?
 	}
 
 	class PassthroughOrderListener implements OrderListener<F, Order<F>> {

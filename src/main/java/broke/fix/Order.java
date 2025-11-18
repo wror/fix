@@ -1,30 +1,23 @@
 package broke.fix;
 
-import broke.fix.dto.CxlRejReason;
-import broke.fix.dto.ExecType;
-import broke.fix.dto.OrdStatus;
-import broke.fix.misc.FixFields;
-import broke.fix.misc.IncomingContext;
-import broke.fix.misc.IdGenerator;
-import broke.fix.misc.OrderListener;
-import broke.fix.misc.NotEnoughQtyException;
-import broke.fix.CancelRequest;
-import broke.fix.NewRequest;
-import broke.fix.OrderComposite;
-import broke.fix.ReplaceRequest;
-import broke.fix.Request;
-import java.util.Collection;
+import static broke.fix.dto.ExecInst.Suspend;
+import static java.lang.Long.max;
+import static java.util.Collections.addAll;
+
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.function.Consumer;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static java.util.Arrays.asList;
-import static java.util.Collections.addAll;
-import static java.lang.Long.max;
-
-import static broke.fix.dto.ExecInst.Suspend;
+import broke.fix.dto.ExecType;
+import broke.fix.dto.OrdStatus;
+import broke.fix.misc.FixFields;
+import broke.fix.misc.IdGenerator;
+import broke.fix.misc.IncomingContext;
+import broke.fix.misc.NotEnoughQtyException;
+import broke.fix.misc.OrderListener;
 
 public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 	private final static Logger log = LogManager.getLogger();

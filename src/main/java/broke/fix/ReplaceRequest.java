@@ -1,12 +1,11 @@
 package broke.fix;
 
-import broke.fix.dto.CxlRejReason;
-import broke.fix.dto.OrdStatus;
-import broke.fix.dto.ExecType;
-import broke.fix.misc.FixFields;
-import broke.fix.Order;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import broke.fix.dto.CxlRejReason;
+import broke.fix.dto.OrdStatus;
+import broke.fix.misc.FixFields;
 
 public class ReplaceRequest<F extends FixFields> extends Request<F> {
 	private final static Logger log = LogManager.getLogger();
@@ -28,7 +27,7 @@ public class ReplaceRequest<F extends FixFields> extends Request<F> {
 
 		//don't support outgoing "blind" replace request
 		//since we only key repo by a single clordid per order, that would prevent supporting the more important blind cancel request
-		if (!order.view().isRoot() && !order.newRequest.getClOrdID().isEmpty() && order.newRequest.getOrderID().isEmpty()) {
+		if (!order.view().isRoot() && order.newRequest.getClOrdID().length() != 0 && order.newRequest.getOrderID().length() == 0) {
 			reject(CxlRejReason.Other);
 			return;
 		}

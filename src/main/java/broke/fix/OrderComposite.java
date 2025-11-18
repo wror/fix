@@ -88,7 +88,7 @@ public class OrderComposite<F extends FixFields> extends OrderComponent<F, Order
 		return order.view().getLeavesQty() - workingQtyOfChildren;
 	}
 
-	public Collection getChildren() {
+	public Collection<OrderComponent> getChildren() {
 		return unmodifiableCollection(children);
 	}
 
