@@ -1,24 +1,19 @@
 package broke.fix.service;
 
-import broke.fix.Order;
-import broke.fix.Request;
-import broke.fix.ReplaceRequest;
-import broke.fix.dto.CxlRejResponseTo;
-import broke.fix.dto.ExecType;
-import broke.fix.misc.FixFields;
-import broke.fix.misc.IdGenerator;
-import broke.fix.misc.IncomingContext;
-import broke.fix.dto.OrdStatus;
-import broke.fix.misc.FixRepository;
+import java.util.Objects;
 
 import javax.inject.Inject;
-
-import java.util.Objects;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static org.apache.logging.log4j.util.Unbox.box;
+import broke.fix.Order;
+import broke.fix.Request;
+import broke.fix.dto.CxlRejResponseTo;
+import broke.fix.dto.ExecType;
+import broke.fix.misc.FixFields;
+import broke.fix.misc.FixRepository;
+import broke.fix.misc.IncomingContext;
 
 public class DownstreamHandler<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();

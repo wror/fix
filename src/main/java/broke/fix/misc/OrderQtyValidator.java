@@ -1,7 +1,6 @@
 package broke.fix.misc;
 
 import broke.fix.Order;
-import broke.fix.dto.OrdRejReason;
 
 public class OrderQtyValidator implements Validator {
 	@Override

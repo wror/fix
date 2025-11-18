@@ -1,34 +1,32 @@
 package broke.fix.service;
 
-import broke.fix.Order;
-import broke.fix.OrderComposite;
-import broke.fix.dto.CxlRejReason;
-import broke.fix.dto.CxlRejResponseTo;
-import broke.fix.dto.ExecType;
-import broke.fix.misc.FixFields;
-import broke.fix.misc.IncomingContext;
-import broke.fix.misc.IdGenerator;
-import broke.fix.misc.OrderListener;
-import broke.fix.misc.SimplePool;
-import broke.fix.misc.FixRepository;
-import broke.fix.misc.UpstreamClOrdIDListener;
-import broke.fix.misc.Validator;
-
-import javax.inject.Inject;
-
 import java.util.Collection;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import javax.inject.Inject;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import broke.fix.Order;
+import broke.fix.OrderComposite;
+import broke.fix.dto.CxlRejReason;
+import broke.fix.dto.ExecType;
+import broke.fix.misc.FixFields;
+import broke.fix.misc.FixRepository;
+import broke.fix.misc.IdGenerator;
+import broke.fix.misc.IncomingContext;
+import broke.fix.misc.OrderListener;
+import broke.fix.misc.SimplePool;
+import broke.fix.misc.UpstreamClOrdIDListener;
+import broke.fix.misc.Validator;
 
 public class UpstreamHandler<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();
 	private final IncomingContext incoming;
 	private final IdGenerator idgen;
-	private final OrderListener<F, OrderComposite<F>> publisher;
+	protected final OrderListener<F, OrderComposite<F>> publisher;
 	private final Set<CharSequence> clOrdIDs;
 	private final FixRepository<F, OrderComposite<F>> repo;
 	private final UpstreamClOrdIDListener upstreamClOrdIDListener;
@@ -112,7 +110,7 @@ public class UpstreamHandler<F extends FixFields> {
 		order.requestCancel(clOrdID);
 	}
 
-	private OrderComposite<F> getOrder(CharSequence orderID, CharSequence clOrdID, Consumer<CxlRejReason> rejector) {
+	protected OrderComposite<F> getOrder(CharSequence orderID, CharSequence clOrdID, Consumer<CxlRejReason> rejector) {
 		if (isDupe(clOrdID)) {
 			rejector.accept(CxlRejReason.DuplicateClOrdID);
 			return null;
