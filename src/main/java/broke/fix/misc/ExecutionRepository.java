@@ -1,15 +1,10 @@
 package broke.fix.misc;
 
-import java.util.Collection;
 import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-import java.util.function.Supplier;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import static org.apache.logging.log4j.util.Unbox.box;
+import javax.annotation.Nullable;
 
 public class ExecutionRepository {
 	private final static Logger log = LogManager.getLogger();
@@ -35,7 +30,7 @@ public class ExecutionRepository {
 		pool.release(execution);
 	}
 
-	public Execution getExecution(CharSequence execID) {
+	public @Nullable Execution getExecution(CharSequence execID) {
 		return executionsByExecID.get(execID);
 	}
 }

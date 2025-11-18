@@ -2,9 +2,7 @@ package broke.fix;
 
 import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.OrdStatus;
-import broke.fix.dto.ExecType;
 import broke.fix.misc.FixFields;
-import broke.fix.Order;
 
 public class CancelRequest<F extends FixFields> extends Request<F> {
 	public CancelRequest(Order<F> order) {

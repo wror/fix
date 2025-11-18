@@ -1,6 +1,7 @@
 package broke.fix.service;
 
 import broke.fix.Order;
+import broke.fix.OrderComponent;
 import broke.fix.OrderComposite;
 import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.ExecType;
@@ -12,14 +13,14 @@ import broke.fix.misc.SimplePool;
 
 import javax.inject.Inject;
 
-public class PassthroughFactory<F extends FixFields> {
+public class PassthroughService<F extends FixFields> {
 	private final IdGenerator idgen;
 	private final SimplePool<PassthroughOrderListener> listenerPool;
 	private final FixRepository<F, Order<F>> repo;
 	private final OrderListener exchangeOrderPublisher;
 
 	@Inject
-	public PassthroughFactory(IdGenerator idgen, FixRepository exchangeOrderRepo, SimplePool listenerPool, OrderListener exchangeOrderPublisher) {
+	public PassthroughService(IdGenerator idgen, FixRepository exchangeOrderRepo, SimplePool listenerPool, OrderListener exchangeOrderPublisher) {
 		this.idgen = idgen;
 		this.listenerPool = listenerPool;
 		this.repo = exchangeOrderRepo;
@@ -33,6 +34,19 @@ public class PassthroughFactory<F extends FixFields> {
 		Order<F> exchangeOrder = repo.acquire().init(idgen.getClOrdID(), sliceFields, listenerPool.acquire().to(clientOrder), exchangeOrderPublisher);
 		repo.addOrder(exchangeOrder);
 		composite.addChild(exchangeOrder);
+	}
+
+	public void requestCancelOfPassthrough(OrderComposite<?> composite) {
+		for (OrderComponent<?, ?> child : composite.getChildren()) {
+			for (OrderListener listener : child.listeners()) {
+				if (listener instanceof PassthroughService<?>.PassthroughOrderListener) {
+					child.listeners().remove(listener);
+					child.requestCancel();
+					return;
+				}
+			}
+		}
+		//TODO indicate there is no passthrough slice?
 	}
 
 	class PassthroughOrderListener implements OrderListener<F, Order<F>> {

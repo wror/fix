@@ -1,18 +1,12 @@
 package broke.fix.misc;
 
-import broke.fix.OrderComponent;
-import broke.fix.Order;
-import broke.fix.OrderComposite;
-import broke.fix.dto.ExecType;
-
-import java.util.Collection;
 import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-import java.util.function.Supplier;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import broke.fix.OrderComponent;
+import broke.fix.dto.ExecType;
 
 public class FixRepository<F, H extends OrderComponent<F, H>> {
 	private final static Logger log = LogManager.getLogger();
@@ -75,7 +69,7 @@ public class FixRepository<F, H extends OrderComponent<F, H>> {
 	public void removeOrder(H order) {
 		if (order.view().isRoot() ) {
 			removeClOrdID(order.view().getOptimisticClOrdID());
-		} else if (order.view().getOrderID().isEmpty()) { //DownstreamHandler might've called removeClOrdID already
+		} else if (order.view().getOrderID().length() == 0) { //DownstreamHandler might've called removeClOrdID already
 			removeClOrdID(order.view().getClOrdID());
 		}
 		orderByOrderID.remove(order.view().getOrderID());

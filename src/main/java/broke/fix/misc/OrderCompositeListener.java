@@ -4,8 +4,6 @@ import broke.fix.Order;
 import broke.fix.OrderComposite;
 import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.ExecType;
-import broke.fix.dto.ExecType;
-import broke.fix.misc.OrderListener;
 
 public class OrderCompositeListener<F extends FixFields> implements OrderListener<F, Order<F>> {
 	private final OrderComposite<F> composite;

@@ -2,6 +2,7 @@ package broke.fix.misc;
 
 import java.util.Queue;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 
 public class SimplePool<T> {
 	private final Queue<T> queue;
@@ -24,7 +25,7 @@ public class SimplePool<T> {
 		return queue.remove();
 	}
 
-	public void release(T object) {
+	public void release(@Nullable T object) {
 		if (object != null) {
 			queue.add(object);
 		}

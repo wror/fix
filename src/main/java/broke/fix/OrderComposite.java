@@ -75,7 +75,7 @@ public class OrderComposite<F extends FixFields> extends OrderComponent<F, Order
 		}
 		child.setParent(this);
 		children.add(child);
-		workingQtyOfChildren += child.getWorkingQty();
+		workingQtyOfChildren += child.getWorkingQty(); //TODO confirm that we don't want to use addWorkingQtyChange method and explain here why not
 	}
 
 	public void removeChild(OrderComponent child) {
@@ -88,7 +88,7 @@ public class OrderComposite<F extends FixFields> extends OrderComponent<F, Order
 		return order.view().getLeavesQty() - workingQtyOfChildren;
 	}
 
-	public Collection getChildren() {
+	public Collection<OrderComponent> getChildren() {
 		return unmodifiableCollection(children);
 	}
 

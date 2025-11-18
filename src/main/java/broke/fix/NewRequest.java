@@ -1,9 +1,8 @@
 package broke.fix;
 
-import broke.fix.dto.OrdStatus;
 import broke.fix.dto.ExecType;
+import broke.fix.dto.OrdStatus;
 import broke.fix.misc.FixFields;
-import broke.fix.Order;
 
 public class NewRequest<F extends FixFields> extends Request<F> {
 	private StringBuffer orderID = new StringBuffer(16);
