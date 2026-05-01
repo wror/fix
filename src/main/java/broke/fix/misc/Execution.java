@@ -12,11 +12,10 @@ public class Execution {
 	private long qty;
 	private double price;
 
-	public Execution init(Order order, long qty, double price) {
+	public Execution(Order order, long qty, double price) {
 		this.order = order;
 		this.qty = qty;
 		this.price = price;
-		return this;
 	}
 
 	public void bust() {
@@ -43,10 +42,14 @@ public class Execution {
 		return price;
 	}
 
-	public static class RestatingExecution extends Execution {
+	public static class ReinstatingExecution extends Execution {
+		public ReinstatingExecution(Order order, long qty, double price) {
+			super(order, qty, price);
+		}
+
 		@Override
 		public void bust() {
-			//order.replace(order.view().getFields() with orderqQty decreased by qty); //TODO
+			//order.replace(order.getFields() with orderqQty decreased by qty); //TODO
 			super.bust();
 		}
 	}

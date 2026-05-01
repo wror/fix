@@ -1,8 +1,8 @@
-package broke.fix.service;
+package broke.fix.downstream;
 
 import broke.fix.Order;
 import broke.fix.dto.ExecType;
-import broke.fix.misc.Execution;
+import broke.fix.dto.OrdRejReason;
 import broke.fix.misc.ExecutionRepository;
 import broke.fix.misc.FixFields;
 
@@ -13,7 +13,7 @@ import org.apache.logging.log4j.Logger;
 
 public class DownstreamStatefulExecutionHandler<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();
-	private final DownstreamHandler simpleHandler;
+	private final DownstreamHandler<?> simpleHandler;
 	private final ExecutionRepository execRepo;
 
 	@Inject
@@ -22,12 +22,10 @@ public class DownstreamStatefulExecutionHandler<F extends FixFields> {
 		this.execRepo = execRepo;
 	}
 
-	public void handleExecutionReport(ExecType execType, long transactTime, CharSequence downstreamOrderID,
-			CharSequence clOrdID, CharSequence origClOrdID,
-			CharSequence execID, CharSequence execRefID,
-			long lastQty, double lastPx) {
+	public void handleExecutionReport(CharSequence execRefID, //TODO @Override?
+			ExecType execType, long transactTime, CharSequence downstreamOrderID, CharSequence clOrdID, long orderQty, long lastQty, double lastPx, OrdRejReason reason) {
 		simpleHandler.incoming.transactTime = transactTime;
-		Order<F> order = (Order<F>)simpleHandler.repo.getOrder(downstreamOrderID, null); //TODO why cast nesc?
+		Order<?> order = simpleHandler.repo.get(downstreamOrderID);
 		if (order == null) {
 			return;
 		}
@@ -39,7 +37,7 @@ public class DownstreamStatefulExecutionHandler<F extends FixFields> {
 				execRepo.getExecution(execRefID).bust();
 				break;
 			default:
-				simpleHandler.handleExecutionReport(execType, transactTime, downstreamOrderID, clOrdID, origClOrdID, lastQty, lastPx);
+				simpleHandler.handleExecutionReport(execType, transactTime, downstreamOrderID, clOrdID, orderQty, lastQty, lastPx, reason);
 		}
 	}
 }

@@ -1,32 +1,39 @@
 package broke.fix.test;
 
+import broke.fix.CompositeOrder;
 import broke.fix.Order;
-import broke.fix.OrderComposite;
 import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.CxlRejResponseTo;
+import broke.fix.dto.ExecRestatementReason;
 import broke.fix.dto.ExecType;
+import broke.fix.dto.OrdRejReason;
 import broke.fix.misc.OrderListener;
 
 import java.util.ArrayDeque;
 
-class UpstreamPublisher implements OrderListener<Fields.Upstream, OrderComposite<Fields.Upstream>> {
+class UpstreamPublisher implements OrderListener<CompositeOrder<Fields.Upstream>> {
 	ArrayDeque<Message> queue = new ArrayDeque<>();
 	
 	@Override
-	public void onExecutionReport(OrderComposite<Fields.Upstream> order, ExecType execType, long qty, double px) {
-		Order.View v = order.view();
-		queue.add(new Message(execType, v.getOrdStatus(), v.getCumQty(), v.getLeavesQty(), qty, v.getClOrdID(), null));
+	public void onNewRequest(CompositeOrder<Fields.Upstream> order) {
+		queue.add(new Message(ExecType.PendingNew, order.getOrdStatus(), 0, order.getLeavesQty(), 0, "", ""));
+	}
+	
+	@Override
+	public void onTrade(CompositeOrder<Fields.Upstream> order, ExecType execType, long qty, double px) {
+		Order v = order;
+		queue.add(new Message(execType, v.getOrdStatus(), v.getCumQty(), v.getLeavesQty(), 0, "", null));
+	}
+	
+	@Override
+	public void onOtherExecutionReport(CompositeOrder<Fields.Upstream> order, ExecType execType, OrdRejReason reason, ExecRestatementReason execRestatementReason) {
+		Order v = order;
+		queue.add(new Message(execType, v.getOrdStatus(), v.getCumQty(), v.getLeavesQty(), 0, "", null));
 	}
 
 	@Override
-	public void onCancelReject(OrderComposite<Fields.Upstream> order, CxlRejReason rejectReason) {
-		Order.View v = order.view();
-		queue.add(new Message(CxlRejResponseTo.Cancel, v.getOrdStatus(), order.getCancelClOrdID(), v.getClOrdID()));
-	}
-
-	@Override
-	public void onReplaceReject(OrderComposite<Fields.Upstream> order, CxlRejReason rejectReason) {
-		Order.View v = order.view();
-		queue.add(new Message(CxlRejResponseTo.Replace, v.getOrdStatus(), order.getReplaceClOrdID(), v.getClOrdID()));
+	public void onCancelReject(CompositeOrder<Fields.Upstream> order, CharSequence clOrdID, CxlRejReason rejectReason) {
+		Order v = order;
+		queue.add(new Message(CxlRejResponseTo.Cancel, v.getOrdStatus(), clOrdID, ""));
 	}
 }

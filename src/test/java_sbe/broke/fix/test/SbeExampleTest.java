@@ -23,7 +23,7 @@ public class SbeExampleTest extends FixTestBase {
 		en.orderQty(100);
 		en.price(1.2);
 		
-		Fields.Upstream f = fieldsPool.acquire();
+		Fields.Upstream f = new Fields.Upstream();
 		f.orderQty = de.orderQty();
 		f.price = de.price();
 		fromUpstream.handleNewRequest("c1", f, 1);

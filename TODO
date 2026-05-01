@@ -1,0 +1,9 @@
+improve validation
+figure out generics regime - listeners need them, who else?
+https://github.com/OpenHFT/JLBH
+pluggable high performance collections, include primitive keyed map
+https://jspecify.dev/
+swtich to system logger
+categorized quantity rollup
+passthrough
+guice it all up, including tests

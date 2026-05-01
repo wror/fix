@@ -1,136 +1,102 @@
 package broke.fix;
 
+import static broke.fix.misc.Util.execRestatementReason;
+import static broke.fix.misc.Util.ordRejReason;
 import static broke.fix.dto.ExecInst.Suspend;
 import static java.lang.Long.max;
-import static java.util.Collections.addAll;
+import static java.lang.System.nanoTime;
 
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Deque;
+import java.util.LinkedList;
 import java.util.function.Consumer;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.ExecType;
 import broke.fix.dto.OrdStatus;
 import broke.fix.misc.FixFields;
-import broke.fix.misc.IdGenerator;
 import broke.fix.misc.IncomingContext;
 import broke.fix.misc.NotEnoughQtyException;
 import broke.fix.misc.OrderListener;
+import broke.fix.request.CancelRequest;
+import broke.fix.request.NewRequest;
+import broke.fix.request.ReplaceRequest;
 
-public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
+public abstract class Order<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();
-	private OrderComposite parent;
+	private final IncomingContext context;
+	protected final Deque<Request<F>> requests = new LinkedList<>();
+	protected final Collection<OrderListener> listeners;
+	protected CharSequence clOrdID;
+	private CompositeOrder<F> parent;
 	private F fields;
-	private long cumQty, origWorkingQty, transactTime, orderTime, internalOrderID;
+	private long cumQty, transactTime, internalOrderID;
 	private double avgPx;
 	private OrdStatus terminalOrdStatus;
-	private final IncomingContext incoming;
-	private final View view = new View();
-	public final IdGenerator idgen;
-	public final Collection<OrderListener<F, Order<F>>> listeners = new ArrayList<>();
-	public final NewRequest<F> newRequest = new NewRequest(this);
-	public final ReplaceRequest<F> replaceRequest = new ReplaceRequest(this);
-	public final CancelRequest cancelRequest = new CancelRequest(this);
 
-	public Order(IncomingContext incoming, IdGenerator idgen) {
-		this.incoming = incoming;
-		this.idgen = idgen;
-	}
-
-	public Order<F> init(CharSequence clOrdID, F fields, OrderListener<F, Order<F>>... listeners) {
-		internalOrderID = idgen.getOrderID();
-		replaceRequest.reset();
-		cancelRequest.reset();
+	public Order(IncomingContext context, F fields, Collection<OrderListener> listeners) {
+		this.context = context;
 		this.fields = fields;
-		avgPx = cumQty = 0;
-		this.listeners.clear();
-		if (listeners != null) {
-			addAll(this.listeners, listeners);
-		}
-		transactTime = incoming.transactTime;
-		orderTime = incoming.getTime();
-		newRequest.init(clOrdID);
-		end(l->l.onNewRequest(this));
-		return this;
+		this.listeners = listeners;
+		this.internalOrderID = nanoTime();
+		this.transactTime = context.transactTime;
+		endTransaction(l->l.onNewRequest(this));
 	}
 
-	public void fill(final long qty, final double px) {
-		begin();
+	public final void fill(final long qty, final double px) {
 		double totalValue = qty * px + cumQty * avgPx;
 		avgPx = totalValue / (qty + cumQty);
 		cumQty += qty;
 		if (parent != null) {
 			parent.fill(qty, px);
 		}
-		transactTime = incoming.transactTime;
-		end(l->l.onExecutionReport(this, ExecType.Trade, qty, px));
+		endTransaction(l->l.onTrade(this, ExecType.Trade, qty, px));
 
-		//separate transaction
-		handleReplaceRequestIfFilled();
-	}
-
-	public void replace(F fields) throws NotEnoughQtyException {
-		begin();
-		if (!canReplace(fields)) { //callers should check this
-			throw new NotEnoughQtyException();
-		}
-		this.fields = fields;
-		if (cumQty < fields.getOrderQty()) {
-			orderTime = incoming.getTime();
-		}
-		transactTime = incoming.transactTime;
-		end(l->l.onExecutionReport(this, ExecType.Replaced, 0, 0));
-
-		//separate transaction
-		//relevant for this being an unsolicted replace
-		handleReplaceRequestIfFilled();
-	}
-
-	private void handleReplaceRequestIfFilled() {
-		//for flexibility, we'll let the publishing layer decide what to do with a pending cancel, in all cases
-		if (replaceRequest.isPending() && cumQty >= replaceRequest.getQty()) {
-			if (replaceRequest.getQty() != fields.getOrderQty()) {
-				replaceRequest.accept(); // https://www.onixs.biz/fix-dictionary/4.2/app_d12.html
-			} else if (cumQty >= fields.getOrderQty()) {
-				replaceRequest.reject();
+		if (isFullyFilled()) {
+			for (Request<F> request : requests) {
+				request.onFill();
 			}
 		}
 	}
 
-	public boolean canReplace(F fields) {
+	 void cancel() {
+		terminate(OrdStatus.Canceled, ExecType.Canceled, null); //TODO param for reason?
+	}
+
+	protected void replace(F fields) throws NotEnoughQtyException {
+		if (!canReplace(fields)) { //callers should check this
+			throw new NotEnoughQtyException();
+		}
+		this.fields = fields;
+		endTransaction(l->l.onOtherExecutionReport(this, ExecType.Replaced, null, null));
+	}
+
+	public boolean canReplace(F newFields) {
+		if (newFields.getOrigOrdModTime() > 0 && newFields.getOrigOrdModTime() != getTransactTime()) {
+			return false;
+		}
 		return parent == null || fields.getOrderQty() - this.fields.getOrderQty() <= parent.getAvailableQty();
 	}
-
-	public void cancel() {
-		terminate(OrdStatus.Canceled, ExecType.Canceled);
-	}
-
-	public void done() {
-		terminate(OrdStatus.DoneForDay, ExecType.DoneForDay);
-	}
-
-	protected void terminate(final OrdStatus status, final ExecType execType) {
-		if (replaceRequest.isPending()) {
-			replaceRequest.reject();
-		}
-		//separate transaction
-		begin();
+	
+	protected final void terminate(final OrdStatus status, final ExecType execType, Object reason) {
+		//TODO maybe respond with the clordid of a cancel request, or a replace down
 		terminalOrdStatus = status;
-		transactTime = incoming.transactTime;
-		end(l->l.onExecutionReport(this, execType, 0, 0));
-	}
+		addWorkingQtyChange(-getWorkingQty());
+		endTransaction(l->l.onOtherExecutionReport(this, execType, ordRejReason(reason), execRestatementReason(reason)));
 
-	protected void begin() {
-		origWorkingQty = getWorkingQty();
-	}
-
-	protected void end(Consumer<OrderListener> listenerCall) {
-		if (parent != null) {
-			parent.addWorkingQtyChange(getWorkingQty() - origWorkingQty); //can be negative
+		for (Request<F> request : requests) {
+			if (request instanceof ReplaceRequest) {
+				request.reject(CxlRejReason.TooLateToCancel);
+			}
 		}
-		for (OrderListener<F, Order<F>> listener : listeners) {
+	}
+
+	protected final void endTransaction(Consumer<OrderListener<Order<F>>> listenerCall) {
+		transactTime = context.transactTime;
+		for (OrderListener<Order<F>> listener : listeners) {
 			try {
 				listenerCall.accept(listener);
 			} catch (RuntimeException e) {
@@ -139,108 +105,75 @@ public class Order<F extends FixFields> extends OrderComponent<F, Order<F>> {
 		}
 	}
 
-	@Override
-	protected void setParent(OrderComposite parent) {
+	public final OrdStatus getOrdStatus() {
+		return
+			terminalOrdStatus != null      ? terminalOrdStatus :
+			!requests.isEmpty()            ? requests.getLast().getPendingStatus() :
+			fields.hasExecInst(Suspend)    ? OrdStatus.Suspended :
+			isFullyFilled()                ? OrdStatus.Filled :
+			cumQty > 0                     ? OrdStatus.PartiallyFilled :
+											 OrdStatus.New;
+	}
+
+	public final F getFields() {
+		return fields;
+	}
+
+	public final long getCumQty() {
+		return cumQty;
+	}
+
+	public final long getLeavesQty() {
+		return terminalOrdStatus != null ? 0 : max(0, fields.getOrderQty() - cumQty);
+	}
+
+	public final double getAvgPx() {
+		return avgPx;
+	}
+
+	public final long getInternalOrderID() {
+		return internalOrderID;
+	}
+
+	public final long getTransactTime() {
+		return transactTime;
+	}
+
+	public final boolean isRoot() {
+		return parent == null;
+	}
+
+	public final CompositeOrder<F> getParent() {
+		return parent;
+	}
+
+	protected final void setParent(CompositeOrder<F> parent) {
 		this.parent = parent;
 	}
 
-	@Override
-	public long getWorkingQty() {
-		if (terminalOrdStatus != null) {
-			return 0;
-		}
-		long potentialOrderQty = max(replaceRequest.isPending() ? replaceRequest.getQty() : 0, fields.getOrderQty());
-		return max(0, potentialOrderQty - cumQty);
+	private final boolean isFullyFilled() { //not public because could still have pending requests, which might surprise people
+		return cumQty > 0 && cumQty >= fields.getOrderQty();
 	}
 
-	@Override
-	public void requestCancel() {
-		cancelRequest.init(null);
+	public final boolean isWorking() {
+		return terminalOrdStatus == null;
 	}
 
-	@Override
-	public void requestReplace(F newFields) {
-		replaceRequest.init(null, newFields);
-	}
-
-	@Override
-	public Collection<OrderListener<F, Order<F>>> listeners() {
-		return listeners;
-	}
-
-	@Override
-	public View view() {
-		return view;
-	}
-	
-	public class View {
-		//getters here are accessible via OrderComposite without extra code there
-
-		public OrdStatus getOrdStatus() {
-			return
-				terminalOrdStatus != null      ? terminalOrdStatus :
-				cancelRequest.isPending()      ? cancelRequest.getStatus() :
-				replaceRequest.isPending()     ? replaceRequest.getStatus() :
-				fields.hasExecInst(Suspend)    ? OrdStatus.Suspended :
-				cumQty >= fields.getOrderQty() ? OrdStatus.Filled :
-				cumQty > 0                     ? OrdStatus.PartiallyFilled :
-			                                         newRequest.getStatus();
-		}
-
-		public F getFields() {
-			return fields;
-		}
-
-		public long getCumQty() {
-			return cumQty;
-		}
-
-		public long getLeavesQty() {
-			return terminalOrdStatus != null ? 0 : fields.getOrderQty() - cumQty;
-		}
-
-		public boolean isWorking() {
-			return terminalOrdStatus == null;
-		}
-
-		public double getAvgPx() {
-			return avgPx;
-		}
-
-		public long getInternalOrderID() {
-			return internalOrderID;
-		}
-
-		public CharSequence getOrderID() {
-			return newRequest.getOrderID();
-		}
-
-		public boolean isPending() {
-			return newRequest.isPending();
-		}
-
-		public CharSequence getClOrdID() {
-			return newRequest.getClOrdID();
-		}
-
-		public CharSequence getOptimisticClOrdID() {
-			return replaceRequest.isPending() ? replaceRequest.getClOrdID() : newRequest.getClOrdID();
-		}
-
-		public long getTransactTime() {
-			return transactTime;
-		}
-
-		public long getOrderTime() {
-			return orderTime;
-		}
-
-		public boolean isRoot() {
-			return parent == null;
-		}
-
-		public OrderComposite getParent() {
-			return parent;
+	protected void addWorkingQtyChange(long qtyChange) {
+		if (parent != null) {
+			parent.addWorkingQtyChange(qtyChange);
 		}
 	}
+
+	protected void onAccept(Request<F> request) {
+	}
+
+	protected void onReject(Request<F> request) {
+	}
+
+	public abstract long getWorkingQty();
+	public abstract void forceCancel();
+	public abstract NewRequest<F> requestNew();
+	public abstract CancelRequest<F> requestCancel();
+	public abstract ReplaceRequest<F> requestReplace(F fields);
 }
