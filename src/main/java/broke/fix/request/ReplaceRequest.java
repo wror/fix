@@ -6,22 +6,29 @@ import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.OrdStatus;
 import broke.fix.misc.FixFields;
 
-public final class ReplaceRequest<F extends FixFields> extends Request<F> {
+public final class ReplaceRequest<O extends Order<F>, F extends FixFields> extends Request<O, F> {
 	private F pendingFields;
 
-	public ReplaceRequest(CharSequence origClOrdID, CharSequence clOrdID, Order<F> order, F newFields) {
-		super(origClOrdID, clOrdID, order);
+	public ReplaceRequest(O order, F newFields) {
+		this(order.nextClOrdID(), order, newFields);
+	}
+
+	public ReplaceRequest(CharSequence clOrdID, O order, F newFields) {
+		super(clOrdID, order);
 		this.pendingFields = newFields;
+		getOrder().endTransaction(l->l.onReplaceRequest((ReplaceRequest)this));
 	}
 	
 	@Override
-	public void onAccept() {
-		replace(pendingFields);
+	public void accept() {
+		setStatus(Status.Accepted);
+		getOrder().replace(pendingFields);
 	}
 
 	@Override
-	public void onReject(Object reason) {
-		endTransaction(l->l.onCancelReject(order, getClOrdID(), cxlRejReason(reason)));
+	public void reject(Object reason) {
+		setStatus(Status.Rejected);
+		getOrder().endTransaction(l->l.onCancelOrReplaceReject(getOrder(), getClOrdID(), cxlRejReason(reason)));
 	}
 
 	@Override
@@ -40,7 +47,7 @@ public final class ReplaceRequest<F extends FixFields> extends Request<F> {
 
 	@Override
 	protected void onFill() {
-		if (getQty() <= order.getFields().getOrderQty()) {
+		if (getOrder().isFullyFilled() && getQty() <= getOrder().getFields().getOrderQty()) {
 			reject(CxlRejReason.TooLateToCancel);
 		}
 		//could accept an amend-up that was sent before the order filled;

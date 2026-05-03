@@ -21,21 +21,20 @@ import broke.fix.misc.FixFields;
 import broke.fix.misc.IncomingContext;
 import broke.fix.misc.NotEnoughQtyException;
 import broke.fix.misc.OrderListener;
-import broke.fix.request.CancelRequest;
-import broke.fix.request.NewRequest;
 import broke.fix.request.ReplaceRequest;
 
-public abstract class Order<F extends FixFields> {
+public class Order<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();
 	private final IncomingContext context;
-	protected final Deque<Request<F>> requests = new LinkedList<>();
-	protected final Collection<OrderListener> listeners;
-	protected CharSequence clOrdID;
+	private final Collection<OrderListener> listeners;
+	private final Deque<Request<?, F>> requests = new LinkedList<>();
+	private CharSequence clOrdID;
 	private CompositeOrder<F> parent;
 	private F fields;
 	private long cumQty, transactTime, internalOrderID;
 	private double avgPx;
 	private OrdStatus terminalOrdStatus;
+	private long requestCounter;
 
 	public Order(IncomingContext context, F fields, Collection<OrderListener> listeners) {
 		this.context = context;
@@ -55,18 +54,21 @@ public abstract class Order<F extends FixFields> {
 		}
 		endTransaction(l->l.onTrade(this, ExecType.Trade, qty, px));
 
-		if (isFullyFilled()) {
-			for (Request<F> request : requests) {
-				request.onFill();
-			}
+		for (Request<?, F> request : requests) {
+			request.onFill();
 		}
 	}
 
-	 void cancel() {
+	//package private to encourage calling either forceCancel() or new CancelRequest() instead
+	void cancel() {
 		terminate(OrdStatus.Canceled, ExecType.Canceled, null); //TODO param for reason?
 	}
 
-	protected void replace(F fields) throws NotEnoughQtyException {
+	public void forceCancel() {
+		cancel();
+	}
+
+	public final void replace(F fields) throws NotEnoughQtyException {
 		if (!canReplace(fields)) { //callers should check this
 			throw new NotEnoughQtyException();
 		}
@@ -81,20 +83,28 @@ public abstract class Order<F extends FixFields> {
 		return parent == null || fields.getOrderQty() - this.fields.getOrderQty() <= parent.getAvailableQty();
 	}
 	
-	protected final void terminate(final OrdStatus status, final ExecType execType, Object reason) {
+	public final void terminate(final OrdStatus status, final ExecType execType, Object reason) {
 		//TODO maybe respond with the clordid of a cancel request, or a replace down
 		terminalOrdStatus = status;
 		addWorkingQtyChange(-getWorkingQty());
 		endTransaction(l->l.onOtherExecutionReport(this, execType, ordRejReason(reason), execRestatementReason(reason)));
 
-		for (Request<F> request : requests) {
+		for (Request<?, F> request : requests) {
 			if (request instanceof ReplaceRequest) {
 				request.reject(CxlRejReason.TooLateToCancel);
 			}
 		}
 	}
 
-	protected final void endTransaction(Consumer<OrderListener<Order<F>>> listenerCall) {
+	public void onRequestChange(Request<?, F> request) {
+		if (request.getStatus() == Request.Status.Pending) {
+			requests.add(request);
+		} else {
+			requests.remove(request);
+		}
+	}
+
+	public final void endTransaction(Consumer<OrderListener<Order<F>>> listenerCall) {
 		transactTime = context.transactTime;
 		for (OrderListener<Order<F>> listener : listeners) {
 			try {
@@ -127,6 +137,10 @@ public abstract class Order<F extends FixFields> {
 		return terminalOrdStatus != null ? 0 : max(0, fields.getOrderQty() - cumQty);
 	}
 
+	public long getWorkingQty() {
+		return getLeavesQty();
+	}
+
 	public final double getAvgPx() {
 		return avgPx;
 	}
@@ -151,12 +165,12 @@ public abstract class Order<F extends FixFields> {
 		this.parent = parent;
 	}
 
-	private final boolean isFullyFilled() { //not public because could still have pending requests, which might surprise people
+	public final boolean isFullyFilled() {
 		return cumQty > 0 && cumQty >= fields.getOrderQty();
 	}
 
 	public final boolean isWorking() {
-		return terminalOrdStatus == null;
+		return terminalOrdStatus == null && !isFullyFilled();
 	}
 
 	protected void addWorkingQtyChange(long qtyChange) {
@@ -165,15 +179,19 @@ public abstract class Order<F extends FixFields> {
 		}
 	}
 
-	protected void onAccept(Request<F> request) {
+	protected final CharSequence getClOrdID() {
+		return clOrdID;
 	}
 
-	protected void onReject(Request<F> request) {
+	protected final void setClOrdID(CharSequence clOrdID) {
+		this.clOrdID = clOrdID;
 	}
 
-	public abstract long getWorkingQty();
-	public abstract void forceCancel();
-	public abstract NewRequest<F> requestNew();
-	public abstract CancelRequest<F> requestCancel();
-	public abstract ReplaceRequest<F> requestReplace(F fields);
+	protected final Iterable<Request<?, F>> requests() {
+		return requests;
+	}
+
+	public final CharSequence nextClOrdID() {
+		return clOrdID = getInternalOrderID()+"."+requestCounter++;
+	}
 }

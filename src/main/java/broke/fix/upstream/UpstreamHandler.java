@@ -1,7 +1,6 @@
 package broke.fix.upstream;
 
 import static broke.fix.upstream.ReasonExceptions.ordRejReason;
-import static broke.fix.RequestWithUpstreamClOrdID.with;
 import static broke.fix.upstream.ReasonExceptions.cxlRejReason;
 
 import java.util.Collection;
@@ -14,22 +13,27 @@ import org.apache.logging.log4j.Logger;
 
 import broke.fix.Order;
 import broke.fix.dto.CxlRejReason;
+import broke.fix.dto.ExecRestatementReason;
 import broke.fix.dto.ExecType;
+import broke.fix.dto.OrdRejReason;
 import broke.fix.CompositeOrder;
 import broke.fix.misc.FixFields;
 import broke.fix.misc.IncomingContext;
 import broke.fix.misc.OrderListener;
 import broke.fix.misc.Validator;
+import broke.fix.request.CancelRequest;
+import broke.fix.request.NewRequest;
+import broke.fix.request.ReplaceRequest;
 
 public class UpstreamHandler<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();
 	private final IncomingContext incoming;
-	protected final OrderListener<CompositeOrder<F>> publisher;
-	private final UpstreamRepository repo;
+	private final OrderListener<CompositeOrder<F>> publisher;
+	private final UpstreamRepository<F> repo;
 	private final Collection<Validator<F>> validators;
 
 	@Inject
-	public UpstreamHandler(IncomingContext incoming, OrderListener<CompositeOrder<F>> publisher, UpstreamRepository repo, Collection<Validator<F>> validators) {
+	public UpstreamHandler(IncomingContext incoming, OrderListener<CompositeOrder<F>> publisher, UpstreamRepository<F> repo, Collection<Validator<F>> validators) {
 		this.incoming = incoming;
 		this.publisher = publisher;
 		this.repo = repo;
@@ -37,25 +41,30 @@ public class UpstreamHandler<F extends FixFields> {
 	}
 
 	public void handleNewRequest(CharSequence clOrdID, F fields, long transactTime) {
-		CompositeOrder<F> order = new CompositeOrder<F>(incoming, fields, publisher);
+		CompositeOrder<F> order = new CompositeOrder<F>(incoming, fields, publisher, cleanupListener);
+		//TODO required fields: origclordid, clordid, transacttime, orderqty, ordtype, side, one of symbol or securityid and securityidsource
 		run(()->{
 			validate(order);
-			repo.add(with(clOrdID, order.requestNew()));
+			repo.add(new NewRequest<>(clOrdID, order));
+			repo.add(order);
 		}, clOrdID, transactTime, e->{publisher.onOtherExecutionReport(order, ExecType.Rejected, ordRejReason(e), null);});
 	}
 
 	public void handleReplaceRequest(CharSequence clOrdID, CharSequence origClOrdID, long transactTime, F fields) {
-		CompositeOrder<F> order = (CompositeOrder<F>)repo.get(origClOrdID);
+		CompositeOrder<F> order = repo.get(origClOrdID);
+		//TODO same required fields as on the New, plus origClOrdID
+		//TODO fields must match: symbol, securityid, securityidsource, 
 		run(()->{
 			validate(order);
-			repo.add(with(clOrdID, order.requestReplace(fields)));
+			repo.add(new ReplaceRequest<>(clOrdID, order, fields));
 		}, clOrdID, transactTime, handler(order, clOrdID));
 	}
 
 	public void handleCancelRequest(CharSequence clOrdID, CharSequence origClOrdID, long transactTime) {
-		CompositeOrder<F> order = (CompositeOrder<F>)repo.get(origClOrdID);
+		//TODO required fields: origclordid, clordid, transacttime, side, one of symbol or securityid and securityidsource
+		CompositeOrder<F> order = repo.get(origClOrdID);
 		run(()->{
-			repo.add(with(clOrdID, order.requestCancel()));
+			repo.add(new CancelRequest<>(clOrdID, order));
 		}, clOrdID, transactTime, handler(order, clOrdID));
 	}
 
@@ -64,7 +73,7 @@ public class UpstreamHandler<F extends FixFields> {
 			incoming.transactTime = transactTime;
 			r.run();
 		} catch (RuntimeException e) {
-			repo.addForDuplicateChecking(clOrdID);
+			repo.addJustForDuplicateChecking(clOrdID);
 			incoming.responseText = e.getMessage();
 			log.warn("Rejected because of exception: {}", incoming.responseText);
 			c.accept(e);
@@ -72,7 +81,7 @@ public class UpstreamHandler<F extends FixFields> {
 	}
 
 	private Consumer<RuntimeException> handler(CompositeOrder<F> order, CharSequence clOrdID) {
-		return (e)->{publisher.onCancelReject(order, clOrdID, order == null ? CxlRejReason.UnknownOrder : cxlRejReason(e));};
+		return (e)->{publisher.onCancelOrReplaceReject(order, clOrdID, order == null ? CxlRejReason.UnknownOrder : cxlRejReason(e));};
 	}
 
 	private void validate(Order<F> order) {
@@ -84,4 +93,21 @@ public class UpstreamHandler<F extends FixFields> {
 			}
 		}
 	}
+
+	private OrderListener<CompositeOrder<F>> cleanupListener = new OrderListener<CompositeOrder<F>>() {
+		@Override
+		public void onTrade(CompositeOrder<F> order, ExecType execType, long qty, double px) {
+			if (!order.isWorking()) {
+				repo.remove(order);
+			}
+		}
+
+		@Override
+		public void onOtherExecutionReport(CompositeOrder<F> order, ExecType execType, OrdRejReason ordRejReason, ExecRestatementReason execRestatementReason) {
+			if (!order.isWorking()) {
+				repo.remove(order);
+			}
+		}
+	};
+
 }

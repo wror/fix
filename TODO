@@ -1,6 +1,8 @@
+https://github.com/OpenHFT/JLBH
+tests!
 improve validation
 figure out generics regime - listeners need them, who else?
-https://github.com/OpenHFT/JLBH
+perhaps do not expose full order in listener, require smaller transactions
 pluggable high performance collections, include primitive keyed map
 https://jspecify.dev/
 swtich to system logger

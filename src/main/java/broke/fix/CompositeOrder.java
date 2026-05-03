@@ -8,8 +8,6 @@ import broke.fix.misc.IncomingContext;
 import broke.fix.misc.NotEnoughQtyException;
 import broke.fix.misc.OrderListener;
 import broke.fix.request.CancelRequest;
-import broke.fix.request.NewRequest;
-import broke.fix.request.ReplaceRequest;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,36 +26,25 @@ public final class CompositeOrder<F extends FixFields> extends Order<F> {
 	}
 
 	@Override
-	protected void onAccept(Request<F> request) {
-		clOrdID = request.getClOrdID(); // pessimistic per https://www.onixs.biz/fix-dictionary/4.4/msgType_G_71.html
-	}
-
-	@Override
-	public NewRequest<F> requestNew() {
-		return new NewRequest<>(null, this);
-	}
-
-	@Override
-	public ReplaceRequest<F> requestReplace(F newFields) {
-		if (onNoWorkingQty != null) {
-			log.warn("Replacing an order hierarchy before a previous replace completed!");
+	public void onRequestChange(Request<?, F> request) {
+		super.onRequestChange(request);
+		if (request.getStatus() == Request.Status.Pending && request.getQty() < getFields().getOrderQty()) {
+			if (onNoWorkingQty != null) {
+				log.warn("Two order hierarchy requests working at the same time!");
+			}
+			cancelChildrenFor(request);
+		} else if (request.getStatus() == Request.Status.Accepted) {
+			setClOrdID(request.getClOrdID()); // pessimistic per https://www.onixs.biz/fix-dictionary/4.4/msgType_G_71.html
 		}
-		return cancelFor(new ReplaceRequest<>(clOrdID, null, this, newFields));
 	}
 
-	@Override
-	public CancelRequest<F> requestCancel() {
-		return cancelFor(new CancelRequest<>(clOrdID, null, this));
-	}
-
-	private <R extends Request<F>> R cancelFor(R r) {
+	private <R extends Request<?, F>> void cancelChildrenFor(R r) {
 		onNoWorkingQty = ()->r.accept();
 		for (Order<F> child : children) {
 			if (child.getWorkingQty() > 0) {
-				child.requestCancel();
+				new CancelRequest(child);
 			}
 		}
-		return r;
 	}
 
 	@Override
@@ -87,6 +74,22 @@ public final class CompositeOrder<F extends FixFields> extends Order<F> {
 		return true;
 	}
 
+	@Override
+	protected void addWorkingQtyChange(long qtyChange) {
+		this.workingQtyOfChildren += qtyChange;
+		super.addWorkingQtyChange(qtyChange);
+
+		if (onNoWorkingQty != null && workingQtyOfChildren == 0) {
+			onNoWorkingQty.run();
+			onNoWorkingQty = null;
+		}
+	}
+
+	@Override
+	public long getWorkingQty() {
+		return workingQtyOfChildren;
+	}
+
 	public void addChild(Order<F> child) throws NotEnoughQtyException {
 		if (child.getWorkingQty() > getAvailableQty()) { //callers should check this
 			throw new NotEnoughQtyException();
@@ -111,21 +114,5 @@ public final class CompositeOrder<F extends FixFields> extends Order<F> {
 
 	public Collection<Order<F>> getChildren() {
 		return unmodifiableCollection(children);
-	}
-
-	@Override
-	protected void addWorkingQtyChange(long qtyChange) {
-		this.workingQtyOfChildren += qtyChange;
-		super.addWorkingQtyChange(qtyChange);
-
-		if (onNoWorkingQty != null && workingQtyOfChildren == 0) {
-			onNoWorkingQty.run();
-			onNoWorkingQty = null;
-		}
-	}
-
-	@Override
-	public long getWorkingQty() {
-		return workingQtyOfChildren;
 	}
 }

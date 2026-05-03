@@ -7,19 +7,31 @@ import broke.fix.dto.ExecType;
 import broke.fix.dto.OrdStatus;
 import broke.fix.misc.FixFields;
 
-public final class CancelRequest<F extends FixFields> extends Request<F> {
-	public CancelRequest(CharSequence origClOrdID, CharSequence clOrdID, Order<F> order) {
-		super(origClOrdID, clOrdID, order);
+public final class CancelRequest<O extends Order<F>, F extends FixFields> extends Request<O, F> {
+	public CancelRequest(O order) {
+		this(order.nextClOrdID(), order);
+	}
+
+	public CancelRequest(CharSequence clOrdID, O order) {
+		super(clOrdID, order);
+		getOrder().endTransaction(l->l.onCancelRequest((CancelRequest)this));
 	}
 
 	@Override
-	public void onAccept() {
-		terminate(OrdStatus.Canceled, ExecType.Canceled, null); //TODO param for reason?
+	public void accept() {
+		setStatus(Status.Accepted);
+		getOrder().terminate(OrdStatus.Canceled, ExecType.Canceled, null); //TODO param for reason?
 	}
 
 	@Override
-	public void onReject(Object reason) {
-		endTransaction(l->l.onCancelReject(order, getClOrdID(), cxlRejReason(reason)));
+	public void reject(Object reason) {
+		setStatus(Status.Rejected);
+		getOrder().endTransaction(l->l.onCancelOrReplaceReject(getOrder(), getClOrdID(), cxlRejReason(reason)));
+	}
+
+	@Override
+	public long getQty() {
+		return 0;
 	}
 
 	@Override

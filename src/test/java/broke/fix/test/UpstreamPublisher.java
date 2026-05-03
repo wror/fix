@@ -32,7 +32,7 @@ class UpstreamPublisher implements OrderListener<CompositeOrder<Fields.Upstream>
 	}
 
 	@Override
-	public void onCancelReject(CompositeOrder<Fields.Upstream> order, CharSequence clOrdID, CxlRejReason rejectReason) {
+	public void onCancelOrReplaceReject(CompositeOrder<Fields.Upstream> order, CharSequence clOrdID, CxlRejReason rejectReason) {
 		Order v = order;
 		queue.add(new Message(CxlRejResponseTo.Cancel, v.getOrdStatus(), clOrdID, ""));
 	}

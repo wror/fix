@@ -6,9 +6,13 @@ import broke.fix.dto.ExecType;
 import broke.fix.dto.OrdStatus;
 import broke.fix.misc.FixFields;
 
-public final class NewRequest<F extends FixFields> extends Request<F> {
-	public NewRequest(CharSequence clOrdID, Order<F> order) {
-		super(null, clOrdID, order);
+public final class NewRequest<O extends Order<F>, F extends FixFields> extends Request<O, F> {
+	public NewRequest(O order) {
+		super(order.nextClOrdID(), order);
+	}
+
+	public NewRequest(CharSequence clOrdID, O order) {
+		super(clOrdID, order);
 	}
 
 	@Override
@@ -17,13 +21,15 @@ public final class NewRequest<F extends FixFields> extends Request<F> {
 	}
 	
 	@Override
-	public void onAccept() {
-		endTransaction(l->l.onOtherExecutionReport(order, ExecType.New, null, null));
+	public void accept() {
+		setStatus(Status.Accepted);
+		getOrder().endTransaction(l->l.onOtherExecutionReport(getOrder(), ExecType.New, null, null));
 	}
 
 	@Override
-	public void onReject(Object reason) {
-		terminate(OrdStatus.Rejected, ExecType.Rejected, reason);
+	public void reject(Object reason) {
+		setStatus(Status.Rejected);
+		getOrder().terminate(OrdStatus.Rejected, ExecType.Rejected, reason);
 	}
 
 	@Override
