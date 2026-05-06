@@ -1,54 +1,57 @@
 package broke.fix.request;
 
+import static broke.fix.misc.FixException.cxlRejReason;
+
 import broke.fix.Order;
 import broke.fix.Request;
-import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.OrdStatus;
+import broke.fix.misc.FixException.Reason;
 import broke.fix.misc.FixFields;
 
-public final class ReplaceRequest<O extends Order<F>, F extends FixFields> extends Request<O, F> {
-	private F pendingFields;
+@SuppressWarnings("unchecked")
+public final class ReplaceRequest<F extends FixFields> extends Request {
+	private F requestedFields;
 
-	public ReplaceRequest(O order, F newFields) {
-		this(order.nextClOrdID(), order, newFields);
+	public ReplaceRequest(Order<F> order, F requestedFields) {
+		this(order, requestedFields, order.getClOrdID(), order.nextClOrdID());
 	}
 
-	public ReplaceRequest(CharSequence clOrdID, O order, F newFields) {
-		super(clOrdID, order);
-		this.pendingFields = newFields;
-		getOrder().endTransaction(l->l.onReplaceRequest((ReplaceRequest)this));
+	public ReplaceRequest(Order<F> order, F requestedFields, CharSequence origClOrdID, CharSequence clOrdID) {
+		super(order, origClOrdID, clOrdID);
+		this.requestedFields = requestedFields;
+		endTransaction(l->l.onReplaceRequest(order, this));
 	}
 	
 	@Override
 	public void accept() {
 		setStatus(Status.Accepted);
-		getOrder().replace(pendingFields);
+		((Order<F>)order).replace(requestedFields);
 	}
 
 	@Override
-	public void reject(Object reason) {
+	public void reject(Reason reason) {
 		setStatus(Status.Rejected);
-		getOrder().endTransaction(l->l.onCancelOrReplaceReject(getOrder(), getClOrdID(), cxlRejReason(reason)));
-	}
-
-	@Override
-	public long getQty() {
-		return pendingFields.getOrderQty();
-	}
-
-	@Override
-	public OrdStatus getPendingStatus() {
-		return OrdStatus.PendingReplace;
+		endTransaction(l->l.onCancelOrReplaceReject(order, clOrdID, cxlRejReason(reason)));
 	}
 
 	public F getRequestedFields() {
-		return pendingFields;
+		return requestedFields;
+	}
+
+	@Override
+	public long getRequestedOrderQty() {
+		return requestedFields.getOrderQty();
+	}
+
+	@Override
+	protected OrdStatus getPendingOrdStatus() {
+		return OrdStatus.PendingReplace;
 	}
 
 	@Override
 	protected void onFill() {
-		if (getOrder().isFullyFilled() && getQty() <= getOrder().getFields().getOrderQty()) {
-			reject(CxlRejReason.TooLateToCancel);
+		if (order.isFullyFilled() && getRequestedOrderQty() <= order.getFields().getOrderQty()) {
+			reject(Reason.TooLate);
 		}
 		//could accept an amend-up that was sent before the order filled;
 		// this is why Filled is not a terminal order status

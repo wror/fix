@@ -1,5 +1,6 @@
 package broke.fix.test;
 
+import broke.fix.dto.ExecInst;
 import broke.fix.dto.OrdStatus;
 import broke.fix.dto.MessageHeaderDecoder;
 import broke.fix.dto.MessageHeaderEncoder;
@@ -11,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.agrona.ExpandableDirectByteBuffer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static java.util.Arrays.asList;
 
 public class SbeExampleTest extends FixTestBase {
 	@Test
@@ -29,6 +29,9 @@ public class SbeExampleTest extends FixTestBase {
 		fromUpstream.handleNewRequest("c1", f, 1);
 		assertEquals(OrdStatus.New, lastFromUpstream().ordStatus());
 	}
-
-	//TODO really interesting would be a realistic outgoing message and jmh it
+	
+	@Test
+	public void testEnum() {
+		assertEquals(1, ExecInst.Suspend.ordinal());
+	}
 }

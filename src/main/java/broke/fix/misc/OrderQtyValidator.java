@@ -5,7 +5,7 @@ import broke.fix.dto.OrdStatus;
 
 public class OrderQtyValidator<F extends FixFields> implements Validator<F> {
 	@Override
-	public CharSequence getInvalidMessage(FixFields fields, Order order) {
+	public CharSequence getInvalidMessage(F fields, Order<F> order) {
 		if (!(fields.getOrderQty() > 0)) {
 			return "orderQty must be > 0";
 		}

@@ -2,59 +2,64 @@ package broke.fix;
 
 import static java.lang.Long.max;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.ExecType;
 import broke.fix.dto.OrdStatus;
+import broke.fix.misc.FixException.Reason;
 import broke.fix.misc.FixFields;
 import broke.fix.misc.IncomingContext;
 import broke.fix.misc.OrderListener;
 import broke.fix.request.ReplaceRequest;
 
+//Could be sent downstream, and is properly careful about pending changes to orderQty
 public final class SendableOrder<F extends FixFields> extends Order<F> {
 	private final static Logger log = LogManager.getLogger();
 	private long potentialOrderQty;
 	private CharSequence downstreamOrderID;
 
-	public SendableOrder(IncomingContext context, F fields, OrderListener<SendableOrder<F>>... listeners) {
-		super(context, fields, new ArrayList<>(Arrays.asList(listeners)));
+	@SafeVarargs 
+	public SendableOrder(IncomingContext context, F fields, OrderListener<SendableOrder<F>, F>... listeners) {
+		super(context, fields, safeAsList(listeners));
 	}
 
 	@Override
-	public void onRequestChange(Request<?, F> request) {
-		super.onRequestChange(request);
+	public void onRequestChange(Request request, Request.Status requestStatus) {
+		super.onRequestChange(request, requestStatus);
 		if (request instanceof ReplaceRequest) {
 			updatePotentialOrderQty();
 		}
-		if (request.getStatus() == Request.Status.Rejected) {
-			setClOrdID(request.getOrigClOrdID());
+		if (requestStatus == Request.Status.Pending) {
+			setClOrdID(request.clOrdID); // optimistic per https://www.fixtrading.org/online-specification/business-area-trade/#:~:text=The%20order%20sender%20should%20chain,this.%29
+		} else if (requestStatus == Request.Status.Rejected) {
+			setClOrdID(request.origClOrdID);
 		}
 	}
 
 	private void updatePotentialOrderQty() {
 		long newPotentialOrderQty = getFields().getOrderQty();
-		for (Request<?, F> request : requests()) {
-			newPotentialOrderQty = max(newPotentialOrderQty, request.getQty());
+		for (Request request : requests()) {
+			newPotentialOrderQty = max(newPotentialOrderQty, request.getRequestedOrderQty());
 		}
-		addWorkingQtyChange(newPotentialOrderQty - potentialOrderQty);
+		addWorkingQtyChange(getCategory(), newPotentialOrderQty - potentialOrderQty);
 		potentialOrderQty = newPotentialOrderQty;
 	}
 
 	@Override
 	public long getWorkingQty() {
-		if (!isWorking()) {
+		if (!isOpen()) {
 			return 0;
 		}
 		return max(0, potentialOrderQty - getCumQty());
 	}
 
-	public void cancel() {
-		super.cancel();
+	public final void fill(final long qty, final double px) {
+		fill(getCategory(), qty, px);
+	}
+
+	public void cancel(CharSequence text) {
+		super.cancel(text);
 	}
 
 	public void done() {
@@ -69,21 +74,22 @@ public final class SendableOrder<F extends FixFields> extends Order<F> {
 		this.downstreamOrderID = downstreamOrderID;
 	}
 
-	public void rejectRequest(CharSequence clOrdID, CxlRejReason reason) {
-		for (Request<?, ?> request: requests()) {
-			if (request.getClOrdID().equals(clOrdID)) {
+	public void rejectRequest(CharSequence clOrdID, Reason reason) {
+		for (Request request: requests()) {
+			if (request.clOrdID.equals(clOrdID)) {
 				request.reject(reason);
 			}
 		}
+		log.error("Nothing matching the OrderCancelReject!");
 	}
 
 	public void acceptReplace(CharSequence clOrdID) {
-		for (Request<?, ?> request: requests()) {
-			if (request instanceof ReplaceRequest && request.getClOrdID().equals(clOrdID)) {
+		for (Request request: requests()) {
+			if (request instanceof ReplaceRequest && request.clOrdID.equals(clOrdID)) {
 				request.accept();
 				return;
 			}
 		}
-		log.error("Nothing matching the Replaced execution report!");
+		log.error("Nothing matching the Replaced ExceptionReport!");
 	}
 }

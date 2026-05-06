@@ -1,44 +1,54 @@
 package broke.fix.upstream;
 
-import java.lang.ref.SoftReference;
 import java.util.HashMap;
 import java.util.Map;
 
 import broke.fix.CompositeOrder;
 import broke.fix.Request;
-import broke.fix.dto.CxlRejReason;
+import broke.fix.misc.FixException;
 import broke.fix.misc.FixFields;
-import broke.fix.upstream.ReasonExceptions.CxlRejException;
+import broke.fix.request.NewRequest;
 
 public class UpstreamRepository<F extends FixFields> {
-	private final Map<CharSequence, SoftReference<CompositeOrder<F>>> orderByClOrdID = new HashMap<>();
+	private final Map<CharSequence, CompositeOrder<F>> orderByClOrdID = new HashMap<>();
 	private final Map<Long, CompositeOrder<F>> orderByOrderID = new HashMap<>();
-	private final static SoftReference nullReference = new SoftReference(null);
 
 	public UpstreamRepository() {
 	}
 
-	public void add(Request<CompositeOrder<F>, F> request) {
-		if (orderByClOrdID.containsKey(request.getClOrdID())) {
-			//TODO obviously not the right exception for News
-			throw new CxlRejException(CxlRejReason.DuplicateClOrdID);
+	public void checkForDuplicates(CharSequence clOrdID) throws FixException {
+		if (orderByClOrdID.containsKey(clOrdID)) {
+			throw new FixException(FixException.Reason.DuplicateClOrdID);
 		}
-		orderByClOrdID.put(request.getClOrdID(), new SoftReference<>((CompositeOrder<F>)request.getOrder()));
 	}
 
-	public void add(CompositeOrder<F> order) {
+	@SuppressWarnings("unchecked")
+	public void add(NewRequest request) {
+		orderByClOrdID.put(request.clOrdID, (CompositeOrder<F>)request.order);
+		add((CompositeOrder<F>)request.order);
+	}
+
+	private void add(CompositeOrder<F> order) {
 		orderByOrderID.put(order.getInternalOrderID(), order);
+	}
+
+	public void addJustForDuplicateChecking(CharSequence clOrdID) {
+		orderByClOrdID.put(clOrdID, null);
+	}
+
+	public CompositeOrder<F> get(CharSequence origClOrdID) {
+		return orderByClOrdID.get(origClOrdID);
+	}
+
+	public CompositeOrder<F> get(long internalOrderID) {
+		return orderByOrderID.get(internalOrderID);
+	}
+
+	public void remove(Request request) {
+		addJustForDuplicateChecking(request.clOrdID);
 	}
 
 	public void remove(CompositeOrder<F> order) {
 		orderByOrderID.remove(order.getInternalOrderID());
-	}
-
-	public void addJustForDuplicateChecking(CharSequence clOrdID) {
-		orderByClOrdID.put(clOrdID, nullReference);
-	}
-
-	public CompositeOrder<F> get(CharSequence origClOrdID) {
-		return orderByClOrdID.getOrDefault(origClOrdID, (SoftReference<CompositeOrder<F>>)nullReference).get();
 	}
 }

@@ -1,46 +1,48 @@
 package broke.fix.request;
 
+import static broke.fix.misc.FixException.cxlRejReason;
+
 import broke.fix.Order;
 import broke.fix.Request;
-import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.ExecType;
 import broke.fix.dto.OrdStatus;
-import broke.fix.misc.FixFields;
+import broke.fix.misc.FixException.Reason;
 
-public final class CancelRequest<O extends Order<F>, F extends FixFields> extends Request<O, F> {
-	public CancelRequest(O order) {
-		this(order.nextClOrdID(), order);
+@SuppressWarnings("unchecked")
+public final class CancelRequest extends Request {
+	public CancelRequest(Order<?> order) {
+		this(order, order.getClOrdID(), order.nextClOrdID());
 	}
 
-	public CancelRequest(CharSequence clOrdID, O order) {
-		super(clOrdID, order);
-		getOrder().endTransaction(l->l.onCancelRequest((CancelRequest)this));
+	public CancelRequest(Order<?> order, CharSequence origClOrdID, CharSequence clOrdID) {
+		super(order, origClOrdID, clOrdID);
+		endTransaction(l->l.onCancelRequest(order, this));
 	}
 
 	@Override
 	public void accept() {
 		setStatus(Status.Accepted);
-		getOrder().terminate(OrdStatus.Canceled, ExecType.Canceled, null); //TODO param for reason?
+		order.terminate(OrdStatus.Canceled, ExecType.Canceled, null);
 	}
 
 	@Override
-	public void reject(Object reason) {
+	public void reject(Reason reason) {
 		setStatus(Status.Rejected);
-		getOrder().endTransaction(l->l.onCancelOrReplaceReject(getOrder(), getClOrdID(), cxlRejReason(reason)));
+		endTransaction(l->l.onCancelOrReplaceReject(order, clOrdID, cxlRejReason(reason)));
 	}
 
 	@Override
-	public long getQty() {
+	public long getRequestedOrderQty() {
 		return 0;
 	}
 
 	@Override
-	public OrdStatus getPendingStatus() {
+	protected OrdStatus getPendingOrdStatus() {
 		return OrdStatus.PendingCancel;
 	}
 
 	@Override
 	protected void onFill() {
-		reject(CxlRejReason.TooLateToCancel);
+		reject(Reason.TooLate);
 	}
 }

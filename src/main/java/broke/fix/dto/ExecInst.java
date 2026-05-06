@@ -1,5 +1,5 @@
 package broke.fix.dto;
 
 public enum ExecInst {
-	NotHeld, Suspend, TradeAlong
+	NotHeld, TradeAlong, Suspend
 }

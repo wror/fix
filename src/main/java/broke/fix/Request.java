@@ -1,69 +1,36 @@
 package broke.fix;
 
-import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.OrdStatus;
-import broke.fix.misc.FixFields;
+import broke.fix.misc.FixException.Reason;
+import broke.fix.misc.OrderListener;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import java.util.function.Consumer;
 
-public abstract class Request<O extends Order<F>, F extends FixFields> {
-	private final static Logger log = LogManager.getLogger();
-	private final CharSequence origClOrdID;
-	private final O order;
+public abstract class Request {
+	public final CharSequence origClOrdID, clOrdID;
+	public final Order<?> order;
+
 	public enum Status { Pending, Accepted, Rejected }
-	private Status status;
-	private CharSequence clOrdID;
 
-	protected abstract OrdStatus getPendingStatus();
+	protected abstract long getRequestedOrderQty();
+	protected abstract OrdStatus getPendingOrdStatus();
 	protected abstract void onFill();
 	public abstract void accept();
-	public abstract void reject(Object reason);
+	public abstract void reject(Reason reason);
 
-	public Request(CharSequence clOrdID, O order) {
-		status = Status.Pending;
+	public Request(Order<?> order, CharSequence origClOrdID, CharSequence clOrdID) {
 		this.order = order;
+		this.origClOrdID = origClOrdID;
 		this.clOrdID = clOrdID;
-		this.origClOrdID = order.getClOrdID();
-		order.onRequestChange(this);
+		order.onRequestChange(this, Status.Pending);
 	}
 
-	protected void setStatus(Status newStatus) {
-		//could happen because request was still available from UpstreamRepository
-		if (status == (newStatus == Status.Accepted ? Status.Rejected : Status.Accepted)) {
-			String message = "Attempted transition from "+ status +" to "+ newStatus;
-			log.warn(message);
-			throw new RuntimeException(message);
-		}
-		status = newStatus;
-		order.onRequestChange(this);
+	protected final void setStatus(Status newStatus) {
+		order.onRequestChange(this, newStatus);
 	}
 
-	public Status getStatus() {
-		return status;
-	}
-
-	public static final CxlRejReason cxlRejReason(Object reason) {
-		if (reason instanceof CxlRejReason) {
-			return (CxlRejReason)reason;
-		} else {
-			return CxlRejReason.Other;
-		}
-	}
-
-	public final CharSequence getClOrdID() {
-		return clOrdID;
-	}
-
-	public final CharSequence getOrigClOrdID() {
-		return origClOrdID;
-	}
-
-	public O getOrder() {
-		return order;
-	}
-
-	public long getQty() {
-		return order.getFields().getOrderQty();
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	protected final void endTransaction(Consumer<OrderListener> listenerCall) {
+		((Order)order).endTransaction(listenerCall);
 	}
 }

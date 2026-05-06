@@ -4,28 +4,24 @@ import broke.fix.Order;
 import broke.fix.dto.ExecType;
 import broke.fix.dto.OrdRejReason;
 import broke.fix.misc.ExecutionRepository;
-import broke.fix.misc.FixFields;
 
 import javax.inject.Inject;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-public class DownstreamStatefulExecutionHandler<F extends FixFields> {
-	private final static Logger log = LogManager.getLogger();
-	private final DownstreamHandler<?> simpleHandler;
+public class DownstreamStatefulExecutionHandler {
+	private final DownstreamHandler simpleHandler;
 	private final ExecutionRepository execRepo;
 
 	@Inject
-	public DownstreamStatefulExecutionHandler(DownstreamHandler<F> simpleHandler, ExecutionRepository execRepo) {
+	public DownstreamStatefulExecutionHandler(DownstreamHandler simpleHandler, ExecutionRepository execRepo) {
 		this.simpleHandler = simpleHandler;
 		this.execRepo = execRepo;
 	}
 
+	@SuppressWarnings("null")
 	public void handleExecutionReport(CharSequence execRefID, //TODO @Override?
-			ExecType execType, long transactTime, CharSequence downstreamOrderID, CharSequence clOrdID, long orderQty, long lastQty, double lastPx, OrdRejReason reason) {
+			ExecType execType, long transactTime, CharSequence downstreamOrderID, CharSequence clOrdID, long orderQty, long lastQty, double lastPx, OrdRejReason reason, CharSequence text) {
 		simpleHandler.incoming.transactTime = transactTime;
-		Order<?> order = simpleHandler.repo.get(downstreamOrderID);
+		Order<?> order = simpleHandler.repo.getByEither(downstreamOrderID, clOrdID);
 		if (order == null) {
 			return;
 		}
@@ -37,7 +33,7 @@ public class DownstreamStatefulExecutionHandler<F extends FixFields> {
 				execRepo.getExecution(execRefID).bust();
 				break;
 			default:
-				simpleHandler.handleExecutionReport(execType, transactTime, downstreamOrderID, clOrdID, orderQty, lastQty, lastPx, reason);
+				simpleHandler.handleExecutionReport(execType, transactTime, downstreamOrderID, clOrdID, orderQty, lastQty, lastPx, reason, text);
 		}
 	}
 }

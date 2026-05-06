@@ -1,18 +1,18 @@
 package broke.fix.misc;
 
-import broke.fix.Order;
+import broke.fix.SendableOrder;
 
 /**
  * if not supporting corrections and busts,
- * or not supporting corrections and bust messages always have the original quantity and price,
+ * or if not supporting corrections, and bust messages always have the original quantity and price,
  * then this class does not need to be used
  */
 public class Execution {
-	private Order order;
+	private SendableOrder<?> order;
 	private long qty;
 	private double price;
 
-	public Execution(Order order, long qty, double price) {
+	public Execution(SendableOrder<?> order, long qty, double price) {
 		this.order = order;
 		this.qty = qty;
 		this.price = price;
@@ -30,7 +30,7 @@ public class Execution {
 		order.fill(qty, price);
 	}
 
-	public Order getOrder() {
+	public SendableOrder<?> getOrder() {
 		return order;
 	}
 
@@ -43,7 +43,7 @@ public class Execution {
 	}
 
 	public static class ReinstatingExecution extends Execution {
-		public ReinstatingExecution(Order order, long qty, double price) {
+		public ReinstatingExecution(SendableOrder<?> order, long qty, double price) {
 			super(order, qty, price);
 		}
 

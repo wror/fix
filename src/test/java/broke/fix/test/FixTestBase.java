@@ -11,8 +11,10 @@ import broke.fix.upstream.UpstreamRepository;
 import java.util.Collection;
 import static java.util.Arrays.asList;
 
+import java.time.Clock;
+
 public class FixTestBase {
-	IncomingContext incoming = new IncomingContext();
+	IncomingContext incoming = new IncomingContext(Clock.systemDefaultZone());
 	Collection<Validator<Fields.Upstream>> validators = asList(new OrderQtyValidator<Fields.Upstream>());
 	UpstreamRepository parentalRepo = new UpstreamRepository();
 	DownstreamRepository childOrderRepo = new DownstreamRepository();

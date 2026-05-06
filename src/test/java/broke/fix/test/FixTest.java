@@ -14,7 +14,7 @@ public class FixTest extends FixTestBase {
 		f.orderQty = 10;
 		f.price = 1.2;
 		fromUpstream.handleNewRequest("c1", f, 1);
-		assertEquals(OrdStatus.New, lastFromUpstream().ordStatus());
+		assertEquals(OrdStatus.PendingNew, lastFromUpstream().ordStatus());
 	}
 
 	@Test
