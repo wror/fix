@@ -12,7 +12,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import broke.fix.Order;
-import broke.fix.Request;
+import broke.fix.dto.CxlRejResponseTo;
 import broke.fix.dto.ExecType;
 import broke.fix.CompositeOrder;
 import broke.fix.misc.FixFields;
@@ -25,10 +25,10 @@ import broke.fix.request.ReplaceRequest;
 
 public class UpstreamHandler<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();
-	private final IncomingContext incoming;
 	private final OrderListener<CompositeOrder<F>, F> publisher;
-	private final UpstreamRepository<F> repo;
 	private final Collection<Validator<F>> validators;
+	public final IncomingContext incoming;
+	public final UpstreamRepository<F> repo;
 
 	@Inject
 	public UpstreamHandler(IncomingContext incoming, OrderListener<CompositeOrder<F>, F> publisher, UpstreamRepository<F> repo, Collection<Validator<F>> validators) {
@@ -38,35 +38,56 @@ public class UpstreamHandler<F extends FixFields> {
 		this.validators = validators;
 	}
 
-	public void handleNewRequest(CharSequence clOrdID, F fields, long transactTime) {
+	public void handleNewRequest(long transactTime, CharSequence instrumentID, CharSequence clOrdID, F fields) {
 		CompositeOrder<F> order = new CompositeOrder<F>(incoming, fields, repo, publisher);
-		//TODO required fields: origclordid, clordid, transacttime, orderqty, ordtype, side, one of symbol or securityid and securityidsource
 		run(()->{
+			require(clOrdID, "clOrdID");
+			require(instrumentID, "instrumentID");
+			require(transactTime, "transactTime");
+			require(fields.getOrderQty(), "orderQty");
+			require(fields.getOrdType(), "ordType");
+			require(fields.getSide(), "side");
 			repo.checkForDuplicates(clOrdID);
 			validate(order, order.getFields());
 			repo.add(new NewRequest(order, clOrdID));
 		}, clOrdID, transactTime, e->{publisher.onOtherExecutionReport(order, ExecType.Rejected, ordRejReason(e), e.getMessage());});
 	}
 
-	public void handleReplaceRequest(CharSequence clOrdID, CharSequence origClOrdID, long transactTime, F fields) {
-		//TODO same required fields as on the New, plus origClOrdID
-		//TODO fields must match: symbol, securityid, securityidsource, 
+	public void handleReplaceRequest(long transactTime, CharSequence instrumentID, CharSequence clOrdID, CharSequence origClOrdID, F fields) {
 		CompositeOrder<F> order = repo.get(origClOrdID);
 		run(()->{
+			require(origClOrdID, "origClOrdID");
+			require(clOrdID, "clOrdID");
+			require(instrumentID, "instrumentID");
+			require(transactTime, "transactTime");
+			require(fields.getOrderQty(), "orderQty");
+			require(fields.getOrdType(), "ordType");
+			require(fields.getSide(), "side");
+			sideMustMatch(order, fields);
 			repo.checkForDuplicates(clOrdID);
 			validate(order, fields);
 			new ReplaceRequest<F>(order, fields, origClOrdID, clOrdID);
-			//TODO is this too weird? it's the same as for downstream, and impossible to get wrong
-		}, clOrdID, transactTime, rejectHandler(order, clOrdID));
+		}, clOrdID, transactTime, rejectHandler(order, CxlRejResponseTo.Replace, clOrdID));
 	}
 
-	public void handleCancelRequest(CharSequence clOrdID, CharSequence origClOrdID, long transactTime) {
-		//TODO required fields: origclordid, clordid, transacttime, side, one of symbol or securityid and securityidsource
+	private void sideMustMatch(CompositeOrder<F> order, F fields) {
+		if (order.getFields().getSide() != fields.getSide()) {
+			String message = "Attempt to amend side, from "+order.getFields().getSide()+" to "+fields.getSide();
+			log.warn(message);
+			throw new RuntimeException(message);
+		}
+	}
+
+	public void handleCancelRequest(long transactTime, CharSequence instrumentID, CharSequence clOrdID, CharSequence origClOrdID) {
 		CompositeOrder<F> order = repo.get(origClOrdID);
 		run(()->{
+			require(origClOrdID, "origClOrdID");
+			require(clOrdID, "clOrdID");
+			require(instrumentID, "instrumentID");
+			require(transactTime, "transactTime");
 			repo.checkForDuplicates(clOrdID);
 			new CancelRequest(order, origClOrdID, clOrdID);
-		}, clOrdID, transactTime, rejectHandler(order, clOrdID));
+		}, clOrdID, transactTime, rejectHandler(order, CxlRejResponseTo.Cancel, clOrdID));
 	}
 
 	interface Runnable {
@@ -85,8 +106,8 @@ public class UpstreamHandler<F extends FixFields> {
 		}
 	}
 
-	private Consumer<Exception> rejectHandler(CompositeOrder<F> order, CharSequence clOrdID) {
-		return (e)->{publisher.onCancelOrReplaceReject(order, clOrdID, cxlRejReason(order, e));};
+	private Consumer<Exception> rejectHandler(CompositeOrder<F> order, CxlRejResponseTo responseTo, CharSequence clOrdID) {
+		return (e)->{publisher.onCancelOrReplaceReject(order, clOrdID, responseTo, cxlRejReason(order, e));};
 	}
 
 	private void validate(Order<F> order, F fields) {
@@ -96,6 +117,14 @@ public class UpstreamHandler<F extends FixFields> {
 				log.warn("Rejected: {}", message);
 				throw new RuntimeException(message.toString());
 			}
+		}
+	}
+
+	private void require(Object value, String name) {
+		if (value == null) {
+			String message = "Missing required field "+name;
+			log.warn(message);
+			throw new RuntimeException(message);
 		}
 	}
 }

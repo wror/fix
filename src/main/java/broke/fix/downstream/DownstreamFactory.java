@@ -7,6 +7,7 @@ import broke.fix.misc.IncomingContext;
 import broke.fix.misc.OrderListener;
 import broke.fix.request.NewRequest;
 
+import java.time.Clock;
 import java.time.InstantSource;
 
 import javax.inject.Inject;
@@ -18,11 +19,11 @@ public class DownstreamFactory<F extends FixFields> {
 	private final InstantSource clock;
 
 	@Inject
-	public DownstreamFactory(DownstreamRepository repo, OrderListener<SendableOrder<F>, F> publisher, InstantSource clock) {
+	public DownstreamFactory(DownstreamRepository repo, OrderListener<SendableOrder<F>, F> publisher) {
 		this.repo = repo;
 		this.publisher = publisher;
-		this.clock = clock;
-		this.context = new IncomingContext(clock);
+		this.clock = Clock.systemDefaultZone();
+		this.context = new IncomingContext(clock, ()->System.nanoTime());
 	}
 
 	public void slice(CompositeOrder<F> parent, F fields) {

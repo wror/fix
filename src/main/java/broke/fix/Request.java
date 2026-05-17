@@ -1,5 +1,6 @@
 package broke.fix;
 
+import broke.fix.dto.ExecType;
 import broke.fix.dto.OrdStatus;
 import broke.fix.misc.FixException.Reason;
 import broke.fix.misc.OrderListener;
@@ -13,8 +14,9 @@ public abstract class Request {
 	public enum Status { Pending, Accepted, Rejected }
 
 	protected abstract long getRequestedOrderQty();
-	protected abstract OrdStatus getPendingOrdStatus();
 	protected abstract void onFill();
+	protected abstract OrdStatus getPendingOrdStatus();
+	public abstract ExecType getExecType();
 	public abstract void accept();
 	public abstract void reject(Reason reason);
 

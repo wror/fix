@@ -13,8 +13,8 @@ public class FixTest extends FixTestBase {
 		Fields.Upstream f = new Fields.Upstream();
 		f.orderQty = 10;
 		f.price = 1.2;
-		fromUpstream.handleNewRequest("c1", f, 1);
-		assertEquals(OrdStatus.PendingNew, lastFromUpstream().ordStatus());
+		fromUpstream.handleNewRequest(1, "IBM", "c1", f);
+		assertEquals(OrdStatus.New, lastFromUpstream().ordStatus());
 	}
 
 	@Test
@@ -22,8 +22,7 @@ public class FixTest extends FixTestBase {
 		Fields.Upstream f = new Fields.Upstream();
 		f.orderQty = 0;
 		f.price = 1.2;
-		fromUpstream.handleNewRequest("c1", f, 1);
-		
+		fromUpstream.handleNewRequest(1, "IBM", "c1", f);
 		assertEquals(ExecType.Rejected, lastFromUpstream().execType());
 	}
 }

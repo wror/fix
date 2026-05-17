@@ -21,6 +21,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
                         <version>1.4.0</version>
                         <executions>
                             <execution>
+                            	<?m2e execute onConfiguration?>
                                 <id>generate sbe</id>
                                 <phase>generate-test-sources</phase>
                                 <goals>

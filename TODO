@@ -5,5 +5,4 @@ perhaps do not expose full order in listener, require smaller transactions
 pluggable high performance collections, especially primitive keyed maps
 https://jspecify.dev/
 swtich to system logger
-passthrough
 guice it all up, including tests

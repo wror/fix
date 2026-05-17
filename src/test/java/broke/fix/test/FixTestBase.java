@@ -14,12 +14,12 @@ import static java.util.Arrays.asList;
 import java.time.Clock;
 
 public class FixTestBase {
-	IncomingContext incoming = new IncomingContext(Clock.systemDefaultZone());
+	IncomingContext incoming = new IncomingContext(Clock.systemDefaultZone(), ()->System.nanoTime());
 	Collection<Validator<Fields.Upstream>> validators = asList(new OrderQtyValidator<Fields.Upstream>());
-	UpstreamRepository parentalRepo = new UpstreamRepository();
+	UpstreamRepository<Fields.Upstream> parentalRepo = new UpstreamRepository<>();
 	DownstreamRepository childOrderRepo = new DownstreamRepository();
 	UpstreamPublisher toUpstream = new UpstreamPublisher();
-	UpstreamHandler fromUpstream = new UpstreamHandler(incoming, toUpstream, parentalRepo, validators);
+	UpstreamHandler<Fields.Upstream> fromUpstream = new UpstreamHandler<>(incoming, toUpstream, parentalRepo, validators);
 	DownstreamHandler fromDownstream = new DownstreamHandler(incoming, childOrderRepo);
 
 	Message lastFromUpstream() {

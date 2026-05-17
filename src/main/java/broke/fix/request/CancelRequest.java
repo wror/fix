@@ -1,6 +1,7 @@
 package broke.fix.request;
 
 import static broke.fix.misc.FixException.cxlRejReason;
+import static broke.fix.dto.CxlRejResponseTo.Cancel;
 
 import broke.fix.Order;
 import broke.fix.Request;
@@ -28,7 +29,7 @@ public final class CancelRequest extends Request {
 	@Override
 	public void reject(Reason reason) {
 		setStatus(Status.Rejected);
-		endTransaction(l->l.onCancelOrReplaceReject(order, clOrdID, cxlRejReason(reason)));
+		endTransaction(l->l.onCancelOrReplaceReject(order, clOrdID, Cancel, cxlRejReason(reason)));
 	}
 
 	@Override
@@ -37,12 +38,17 @@ public final class CancelRequest extends Request {
 	}
 
 	@Override
+	protected void onFill() {
+		reject(Reason.TooLate);
+	}
+
+	@Override
 	protected OrdStatus getPendingOrdStatus() {
 		return OrdStatus.PendingCancel;
 	}
 
 	@Override
-	protected void onFill() {
-		reject(Reason.TooLate);
+	public ExecType getExecType() {
+		return ExecType.Canceled;
 	}
 }

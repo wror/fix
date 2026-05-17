@@ -3,6 +3,8 @@ package broke.fix.misc;
 import static java.util.List.of;
 
 import java.util.Collection;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import broke.fix.Order;
 import broke.fix.dto.CxlRejReason;
@@ -16,19 +18,21 @@ public class FixException extends Exception {
 	}
 
 	record ReasonTuple(Reason reason, CxlRejReason cxlRej, OrdRejReason ordRej) {}
+	public static ReasonTuple other =
+		new ReasonTuple(Reason.Other,				CxlRejReason.Other,				OrdRejReason.Other);
 	private static Collection<ReasonTuple> reasons = of(
-		new ReasonTuple(Reason.TooLate,          CxlRejReason.TooLateToCancel,  OrdRejReason.TooLateToEnter),
-		new ReasonTuple(Reason.DuplicateClOrdID, CxlRejReason.DuplicateClOrdID, OrdRejReason.DuplicateClOrdID),
-		new ReasonTuple(Reason.Other,            CxlRejReason.Other,            OrdRejReason.Other),
-		new ReasonTuple(Reason.UnknownOrder,     CxlRejReason.UnknownOrder,     null)
+		new ReasonTuple(Reason.TooLate,	CxlRejReason.TooLateToCancel,	OrdRejReason.TooLateToEnter),
+		new ReasonTuple(Reason.DuplicateClOrdID,	CxlRejReason.DuplicateClOrdID,	OrdRejReason.DuplicateClOrdID),
+		new ReasonTuple(Reason.UnknownOrder,	CxlRejReason.UnknownOrder,	null),
+		other
 	);
 
 	public static Reason reason(OrdRejReason ordRej) {
-		return reasons.stream().filter(r->r.ordRej==ordRej).findFirst().map(r->r.reason).orElse(Reason.Other);
+		return get(r->r.ordRej==ordRej, r->r.reason);
 	}
 
 	public static Reason reason(CxlRejReason cxlRej) {
-		return reasons.stream().filter(r->r.cxlRej==cxlRej).findFirst().map(r->r.reason).orElse(Reason.Other);
+		return get(r->r.cxlRej==cxlRej, r->r.reason);
 	}
 
 	public static OrdRejReason ordRejReason(Exception e) {
@@ -36,7 +40,7 @@ public class FixException extends Exception {
 	}
 
 	public static OrdRejReason ordRejReason(Reason reason) {
-		return reasons.stream().filter(r->r.reason==reason).findFirst().map(r->r.ordRej).orElse(OrdRejReason.Other);
+		return get(r->r.reason==reason, r->r.ordRej);
 	}
 
 	public static CxlRejReason cxlRejReason(Order<?> order, Exception e) {
@@ -44,7 +48,11 @@ public class FixException extends Exception {
 	}
 
 	public static CxlRejReason cxlRejReason(Reason reason) {
-		return reasons.stream().filter(r->r.reason==reason).findFirst().map(r->r.cxlRej).orElse(CxlRejReason.Other);
+		return get(r->r.reason==reason, r->r.cxlRej);
+	}
+
+	private static <R> R get(Predicate<ReasonTuple> filter, Function<ReasonTuple, R> map) {
+		return map.apply(reasons.stream().filter(filter).findFirst().orElse(other));
 	}
 
 	public static Reason reason(Exception e) {

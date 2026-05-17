@@ -35,12 +35,17 @@ public final class NewRequest extends Request {
 	}
 
 	@Override
+	protected void onFill() {
+		accept();
+	}
+
+	@Override
 	protected OrdStatus getPendingOrdStatus() {
 		return OrdStatus.PendingNew;
 	}
 
 	@Override
-	protected void onFill() {
-		accept();
+	public ExecType getExecType() {
+		return ExecType.New;
 	}
 }

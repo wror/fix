@@ -1,9 +1,11 @@
 package broke.fix.request;
 
 import static broke.fix.misc.FixException.cxlRejReason;
+import static broke.fix.dto.CxlRejResponseTo.Replace;
 
 import broke.fix.Order;
 import broke.fix.Request;
+import broke.fix.dto.ExecType;
 import broke.fix.dto.OrdStatus;
 import broke.fix.misc.FixException.Reason;
 import broke.fix.misc.FixFields;
@@ -31,7 +33,7 @@ public final class ReplaceRequest<F extends FixFields> extends Request {
 	@Override
 	public void reject(Reason reason) {
 		setStatus(Status.Rejected);
-		endTransaction(l->l.onCancelOrReplaceReject(order, clOrdID, cxlRejReason(reason)));
+		endTransaction(l->l.onCancelOrReplaceReject(order, clOrdID, Replace, cxlRejReason(reason)));
 	}
 
 	public F getRequestedFields() {
@@ -44,16 +46,21 @@ public final class ReplaceRequest<F extends FixFields> extends Request {
 	}
 
 	@Override
-	protected OrdStatus getPendingOrdStatus() {
-		return OrdStatus.PendingReplace;
-	}
-
-	@Override
 	protected void onFill() {
 		if (order.isFullyFilled() && getRequestedOrderQty() <= order.getFields().getOrderQty()) {
 			reject(Reason.TooLate);
 		}
 		//could accept an amend-up that was sent before the order filled;
 		// this is why Filled is not a terminal order status
+	}
+
+	@Override
+	protected OrdStatus getPendingOrdStatus() {
+		return OrdStatus.PendingReplace;
+	}
+
+	@Override
+	public ExecType getExecType() {
+		return ExecType.Replaced;
 	}
 }

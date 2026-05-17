@@ -26,7 +26,7 @@ public class SbeExampleTest extends FixTestBase {
 		Fields.Upstream f = new Fields.Upstream();
 		f.orderQty = de.orderQty();
 		f.price = de.price();
-		fromUpstream.handleNewRequest("c1", f, 1);
+		fromUpstream.handleNewRequest(1, "IBM", "c1", f);
 		assertEquals(OrdStatus.New, lastFromUpstream().ordStatus());
 	}
 	

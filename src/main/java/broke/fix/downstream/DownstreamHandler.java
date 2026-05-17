@@ -8,13 +8,19 @@ import org.apache.logging.log4j.Logger;
 import broke.fix.dto.CxlRejReason;
 import broke.fix.dto.ExecType;
 import broke.fix.dto.OrdRejReason;
+import broke.fix.dto.OrdStatus;
+import broke.fix.dto.Side;
 import broke.fix.misc.IncomingContext;
 import broke.fix.request.NewRequest;
 
 import static broke.fix.misc.FixException.reason;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public class DownstreamHandler {
 	private final static Logger log = LogManager.getLogger();
+	private final Set<CharSequence> execIDs = new HashSet<>();
 	final IncomingContext incoming;
 	final DownstreamRepository repo;
 
@@ -24,9 +30,18 @@ public class DownstreamHandler {
 		this.repo = repo;
 	}
 
-	public void handleExecutionReport(ExecType execType, long transactTime, CharSequence downstreamOrderID, CharSequence clOrdID, long orderQty, long lastQty, double lastPx, OrdRejReason ordRejReason, CharSequence text) {
+	public void handleExecutionReport(CharSequence execID, ExecType execType, long transactTime, CharSequence downstreamOrderID,
+			CharSequence clOrdID, long orderQty, long lastQty, double lastPx, OrdRejReason ordRejReason, CharSequence text,
+			CharSequence instrumentID, OrdStatus ordStatus, Side side, long leavesQty, long cumQty) {
 		incoming.transactTime = transactTime;
-		//TODO required orderID, execID, execType, ordStatus, instrument fields, side, cumQty
+		require(downstreamOrderID, "orderID");
+		require(execID, "execID");
+		require(execType, "execType");
+		require(instrumentID, "instrumentID");
+		require(ordStatus, "ordStatus");
+		require(side, "side");
+		require(cumQty, "cumQty");
+		require(leavesQty, "leavesQty");
 		try {
 			switch (execType) {
 				case Rejected:
@@ -39,7 +54,9 @@ public class DownstreamHandler {
 					break;
 				case TradeCancel:
 				case Trade:
-					repo.getByEither(downstreamOrderID, clOrdID).fill(lastQty, lastPx);
+					if (notYetApplied(execID)) {
+						repo.getByEither(downstreamOrderID, clOrdID).fill(lastQty, lastPx);
+					}
 					break;
 				case Replaced:
 					repo.getByEither(downstreamOrderID, clOrdID).acceptReplace(clOrdID);
@@ -58,12 +75,30 @@ public class DownstreamHandler {
 		}
 	}
 
-	//TODO required CxlRejResponseTo, ordStatus, clOrdID, origClOrdID, OrderID
-	public void handleOrderCancelReject(CxlRejReason cxlRejReason, CharSequence downstreamOrderID, CharSequence clOrdID) {
+	boolean notYetApplied(CharSequence execID) {
+		if (execIDs.add(execID)) {
+			return true;
+		} else {
+			log.warn("Already applied execID {}", execID);
+			return false;
+		}
+	}
+
+	public void handleOrderCancelReject(CxlRejReason cxlRejReason, CharSequence downstreamOrderID, CharSequence origClOrdID, CharSequence clOrdID, OrdStatus ordStatus) {
+		require(downstreamOrderID, "orderID");
+		require(clOrdID, "clOrdID");
+		require(origClOrdID, "origClOrdID");
+		require(ordStatus, "ordStatus");
 		try {
 			repo.getByEither(downstreamOrderID, clOrdID).rejectRequest(clOrdID, reason(cxlRejReason));
 		} catch (RuntimeException e) {
 			log.warn("Couldn't apply to {}/{}", downstreamOrderID, clOrdID, e);
+		}
+	}
+
+	private void require(Object value, String name) {
+		if (value == null) {
+			log.warn("Missing required field {}", name);
 		}
 	}
 }

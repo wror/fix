@@ -24,7 +24,7 @@ public abstract class Order<F extends FixFields> {
 	private final static Logger log = LogManager.getLogger();
 	private final IncomingContext context;
 	private final Collection<OrderListener<Order<F>, F>> listeners;
-	private final Deque<Request> requests = new LinkedList<>();
+	private final Deque<Request> pendingRequsts = new LinkedList<>();
 	private final OrderCategory category;
 	private CharSequence clOrdID;
 	private CompositeOrder<F> parent;
@@ -70,7 +70,7 @@ public abstract class Order<F extends FixFields> {
 		}
 	}
 
-	//package private to encourage calling either forceCancel() or new CancelRequest() instead
+	//package private to encourage instead calling either forceCancel() or new CancelRequest()
 	void cancel(CharSequence text) {
 		terminate(OrdStatus.Canceled, ExecType.Canceled, text);
 	}
@@ -103,11 +103,11 @@ public abstract class Order<F extends FixFields> {
 
 	//onRequestChange() and endTransaction() are the generic contract that Order provides to Request (in addition to cancel() and replace())
 
-	protected void onRequestChange(Request request, Request.Status requestStatus) {
+	void onRequestChange(Request request, Request.Status requestStatus) {
 		if (requestStatus == Request.Status.Pending) {
-			requests.add(request);
+			pendingRequsts.add(request);
 		} else {
-			requests.remove(request);
+			pendingRequsts.remove(request);
 		}
 	}
 
@@ -122,13 +122,13 @@ public abstract class Order<F extends FixFields> {
 		}
 	}
 
-	protected final Iterable<Request> requests() {
-		return requests;
+	public final Iterable<Request> pendingRequsts() {
+		return pendingRequsts;
 	}
 
 	public final OrdStatus getOrdStatus() {
 		return
-			!requests.isEmpty()            ? requests.getLast().getPendingOrdStatus() :
+			!pendingRequsts.isEmpty()      ? pendingRequsts.getLast().getPendingOrdStatus() :
 			terminalOrdStatus != null      ? terminalOrdStatus :
 			fields.hasExecInst(Suspend)    ? OrdStatus.Suspended :
 			isFullyFilled()                ? OrdStatus.Filled :
@@ -181,8 +181,8 @@ public abstract class Order<F extends FixFields> {
 		return cumQty > 0 && cumQty >= fields.getOrderQty();
 	}
 
-	public final boolean isOpen() {
-		return terminalOrdStatus == null && !isFullyFilled();
+	public final boolean isClosed() {
+		return terminalOrdStatus != null || isFullyFilled();
 	}
 
 	public final CharSequence getClOrdID() {

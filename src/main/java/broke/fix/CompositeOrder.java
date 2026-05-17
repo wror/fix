@@ -26,8 +26,6 @@ public final class CompositeOrder<F extends FixFields> extends Order<F> {
 	private Runnable onNoWorkingQty;
 	private Map<OrderCategory, Double> workingQtys = new EnumMap<>(OrderCategory.class), cumQtys = new EnumMap<>(OrderCategory.class);
 
-	//TODO extract a UpstreamOrder subclass, to split out the request and repo handling? i.e. from onRequestChange, fill, terminate
-
 	@SafeVarargs
 	public CompositeOrder(IncomingContext context, F fields, UpstreamRepository<F> repo, OrderListener<CompositeOrder<F>, F>... listeners) {
 		super(context, fields, safeAsList(listeners));
@@ -35,7 +33,7 @@ public final class CompositeOrder<F extends FixFields> extends Order<F> {
 	}
 
 	@Override
-	public void onRequestChange(Request request, Request.Status requestStatus) {
+	void onRequestChange(Request request, Request.Status requestStatus) {
 		super.onRequestChange(request, requestStatus);
 		if (requestStatus == Request.Status.Pending && request.getRequestedOrderQty() < getFields().getOrderQty()) {
 			cancelChildrenFor(request);
@@ -76,12 +74,11 @@ public final class CompositeOrder<F extends FixFields> extends Order<F> {
 		if (requestedFields.getOrderQty() < workingQtyOfChildren) {
 			return false;
 		}
-		if (requestedFields.isPriceLessGenerousThan(this.getFields().getPrice())) {
+		if (requestedFields.areMoreRestrictiveThan(getFields())) {
 			for (Order<F> child : children) {
-				if (requestedFields.isPriceLessGenerousThan(child.getFields().getPrice()) && child.isOpen()) {
+				if (requestedFields.areMoreRestrictiveThan(child.getFields()) && !child.isClosed()) {
 					return false;
 				}
-				//TODO other fields?
 			}
 		}
 		return true;
@@ -91,7 +88,7 @@ public final class CompositeOrder<F extends FixFields> extends Order<F> {
 	public void terminate(final OrdStatus status, final ExecType execType, CharSequence reason) {
 		super.terminate(status, execType, reason);
 
-		for (Request request : requests()) {
+		for (Request request : pendingRequsts()) {
 			if (request.getRequestedOrderQty() >= getFields().getOrderQty()) {
 				request.reject(Reason.TooLate);
 			} else {
@@ -109,10 +106,10 @@ public final class CompositeOrder<F extends FixFields> extends Order<F> {
 		add(cumQtys, category, fillQty);
 		addWorkingQtyChangeOnThis(category, -fillQty);
 
-		for (Request request : requests()) {
+		for (Request request : pendingRequsts()) {
 			request.onFill();
 		}
-		if (repo != null && !isOpen()) {
+		if (repo != null && isClosed()) {
 			repo.remove(this);
 		}
 	}

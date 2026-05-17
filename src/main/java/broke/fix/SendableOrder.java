@@ -39,7 +39,7 @@ public final class SendableOrder<F extends FixFields> extends Order<F> {
 
 	private void updatePotentialOrderQty() {
 		long newPotentialOrderQty = getFields().getOrderQty();
-		for (Request request : requests()) {
+		for (Request request : pendingRequsts()) {
 			newPotentialOrderQty = max(newPotentialOrderQty, request.getRequestedOrderQty());
 		}
 		addWorkingQtyChange(getCategory(), newPotentialOrderQty - potentialOrderQty);
@@ -48,7 +48,7 @@ public final class SendableOrder<F extends FixFields> extends Order<F> {
 
 	@Override
 	public long getWorkingQty() {
-		if (!isOpen()) {
+		if (isClosed()) {
 			return 0;
 		}
 		return max(0, potentialOrderQty - getCumQty());
@@ -75,7 +75,7 @@ public final class SendableOrder<F extends FixFields> extends Order<F> {
 	}
 
 	public void rejectRequest(CharSequence clOrdID, Reason reason) {
-		for (Request request: requests()) {
+		for (Request request: pendingRequsts()) {
 			if (request.clOrdID.equals(clOrdID)) {
 				request.reject(reason);
 			}
@@ -84,7 +84,7 @@ public final class SendableOrder<F extends FixFields> extends Order<F> {
 	}
 
 	public void acceptReplace(CharSequence clOrdID) {
-		for (Request request: requests()) {
+		for (Request request: pendingRequsts()) {
 			if (request instanceof ReplaceRequest && request.clOrdID.equals(clOrdID)) {
 				request.accept();
 				return;

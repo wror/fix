@@ -1,5 +1,5 @@
 package broke.fix.dto;
 
 public enum OrdType {
-	Market, Limit
+	Market, Limit, Stop, StopLimit
 }

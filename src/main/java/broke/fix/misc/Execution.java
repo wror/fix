@@ -16,6 +16,7 @@ public class Execution {
 		this.order = order;
 		this.qty = qty;
 		this.price = price;
+		order.fill(qty, price);
 	}
 
 	public void bust() {
@@ -49,8 +50,13 @@ public class Execution {
 
 		@Override
 		public void bust() {
-			//order.replace(order.getFields() with orderqQty decreased by qty); //TODO
+			RestatableFixFields fields = (RestatableFixFields)getOrder().getFields();
+			fields.setOrderQty(fields.getOrderQty() - getQty());
 			super.bust();
+		}
+
+		interface RestatableFixFields extends FixFields {
+			void setOrderQty(long v);
 		}
 	}
 }
